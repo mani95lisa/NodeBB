@@ -14,6 +14,13 @@
 
 	You should have received a copy of the GNU General Public License
 	along with this program.  If not, see <http://www.gnu.org/licenses/>.
+	"redis": {
+        "host": "redis.duapp.com",
+        "port": "80",
+        "username":"KktW3LP8Bhlvteqkyo6f6zCX",
+        "password": "SBsaOp4CsLa8mq3ddHb6LFLgT2eMVYbI",
+        "database": "VMCAsbQCiHwjrksolUbw"
+    },
 */
 
 

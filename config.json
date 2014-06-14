@@ -1,0 +1,18 @@
+{
+    "base_url": "http://localhost:18080",
+    "port": "18080",
+    "secret": "66e8fcbb-fab7-4036-88b3-8e81da911d09",
+    "bind_address": "0.0.0.0",
+    "database": "redis",
+    "redis": {
+        "host": "redis.duapp.com",
+        "port": "80",
+        "username":"KktW3LP8Bhlvteqkyo6f6zCX",
+        "password": "SBsaOp4CsLa8mq3ddHb6LFLgT2eMVYbI",
+        "database": "VMCAsbQCiHwjrksolUbw"
+    },
+    "bcrypt_rounds": 12,
+    "upload_path": "/public/uploads",
+    "use_port": true,
+    "relative_path": ""
+}

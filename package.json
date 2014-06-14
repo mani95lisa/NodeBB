@@ -1,13 +1,7 @@
 {
   "name": "nodebb",
-  "license": "GPLv3 or later",
   "description": "NodeBB Forum",
   "version": "0.4.3",
-  "homepage": "http://www.nodebb.org",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/NodeBB/NodeBB/"
-  },
   "main": "app.js",
   "scripts": {
     "start": "./nodebb start",
@@ -51,31 +45,5 @@
     "nodebb-theme-lavender": "~0.0.26",
     "nodebb-plugin-soundpack-default": "~0.1.1",
     "nodebb-plugin-dbsearch": "0.0.9"
-  },
-  "devDependencies": {
-    "mocha": "~1.13.0"
-  },
-  "bugs": {
-    "url": "https://github.com/NodeBB/NodeBB/issues"
-  },
-  "engines": {
-    "node": ">=0.8"
-  },
-  "maintainers": [
-    {
-      "name": "Andrew Rodrigues",
-      "email": "andrew@designcreateplay.com",
-      "url": "https://github.com/psychobunny"
-    },
-    {
-      "name": "Julian Lam",
-      "email": "julian@designcreateplay.com",
-      "url": "https://github.com/julianlam"
-    },
-    {
-      "name": "Barış Soner Uşaklı",
-      "email": "baris@designcreateplay.com",
-      "url": "https://github.com/barisusakli"
-    }
-  ]
+  }
 }

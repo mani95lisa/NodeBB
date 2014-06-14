@@ -58,7 +58,7 @@
 		}
 
 		if (nconf.get('redis:password')) {
-			redisClient.auth(nconf.get('redis:password'));
+			redisClient.auth(nconf.get('redis:username')+'-'+nconf.get('redis:password')+'-'+nconf.get('redis:database'));
 		} else {
 			winston.warn('You have no redis password setup!');
 		}
@@ -82,16 +82,16 @@
 		module.postSearch = reds.createSearch('nodebbpostsearch');
 		module.topicSearch = reds.createSearch('nodebbtopicsearch');
 
-		var db = parseInt(nconf.get('redis:database'), 10);
+		// var db = parseInt(nconf.get('redis:database'), 10);
 
-		if (db) {
-			redisClient.select(db, function(error) {
-				if(error) {
-					winston.error("NodeBB could not connect to your Redis database. Redis returned the following error: " + error.message);
-					process.exit();
-				}
-			});
-		}
+		// if (db) {
+		// 	redisClient.select(db, function(error) {
+		// 		if(error) {
+		// 			winston.error("NodeBB could not connect to your Redis database. Redis returned the following error: " + error.message);
+		// 			process.exit();
+		// 		}
+		// 	});
+		// }
 
 		require('./redis/main')(redisClient, module);
 		require('./redis/hash')(redisClient, module);
