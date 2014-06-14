@@ -4,9 +4,7 @@
   "version": "0.4.3",
   "main": "app.js",
   "scripts": {
-    "start": "./nodebb start",
-    "stop": "./nodebb stop",
-    "test": "mocha ./tests -t 10000"
+    "start": "node app.js"
   },
   "dependencies": {
     "express": "3.2.0",
