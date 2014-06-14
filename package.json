@@ -42,6 +42,7 @@
     "nodebb-theme-vanilla": "~0.0.21",
     "nodebb-theme-lavender": "~0.0.26",
     "nodebb-plugin-soundpack-default": "~0.1.1",
-    "nodebb-plugin-dbsearch": "0.0.9"
+    "nodebb-plugin-dbsearch": "0.0.9",
+    "redis": "~0.10.1"
   }
 }
