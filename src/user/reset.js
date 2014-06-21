@@ -54,7 +54,7 @@ var async = require('async'),
 				site_title: (meta.config.title || 'NodeBB'),
 				reset_link: reset_link,
 
-				subject: 'Password Reset Requested - ' + (meta.config.title || 'NodeBB') + '!',
+				subject: '密码重置 - ' + (meta.config.title || 'NodeBB') + '!',
 				template: 'reset',
 				uid: uid
 			});

@@ -230,7 +230,7 @@ define('composer', ['taskbar', 'composer/controls', 'composer/uploads', 'compose
 
 				postContainer.on('click', '.action-bar button[data-action="discard"]', function() {
 					if (composer.posts[post_uuid].modified) {
-						bootbox.confirm('Are you sure you wish to discard this post?', function(confirm) {
+						bootbox.confirm('您确定放弃吗?', function(confirm) {
 							if (confirm) {
 								discard(post_uuid);
 							}

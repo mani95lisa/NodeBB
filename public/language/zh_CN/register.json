@@ -1,7 +1,7 @@
 {
     "register": "注册",
     "help.email": "默认情况下，你的邮箱不会公开。",
-    "help.username_restrictions": "用户名由%1到%2个字符组成。其他人可以通过 @<span id='yourUsername'>用户名</span> 点名你。",
+    "help.username_restrictions": "用户名由%1到%2个字符组成。其他人可以通过 @<span id='yourUsername'>用户名</span> 来联系你。",
     "help.minimum_password_length": "密码必须至少包含%1个字符。",
     "email_address": "邮箱地址",
     "email_address_placeholder": "输入邮箱地址",
