@@ -53,7 +53,7 @@ var async = require('async'),
 						confirm_link: confirm_link,
 						confirm_code: confirm_code,
 
-						subject: 'Welcome to ' + (meta.config.title || 'NodeBB') + '!',
+						subject: '欢迎来到 swift.tf !',
 						template: 'welcome',
 						uid: uid
 					};
