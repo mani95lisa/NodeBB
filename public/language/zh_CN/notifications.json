@@ -17,7 +17,7 @@
     "user_posted_to": "<strong>%1</strong>回复了<strong>%2</strong>",
     "email-confirmed": "邮箱认证成功",
     "email-confirmed-message": "感谢您认证您的邮箱，论坛所有功能均已激活",
-    "email-confirm-error": "邮箱认证出错，请稍候再试",
-    "email-confirm-error-message": "认证邮箱出错，或许是链接过期，请重新再试",
+    "email-confirm-error": "邮箱认证出错",
+    "email-confirm-error-message": "或许是链接已过期，请到您的个人主页的“编辑”界面再请求发送认证邮件",
     "email-confirm-sent": "认证邮件已发送，请注意查收"
 }
