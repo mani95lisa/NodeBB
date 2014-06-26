@@ -15,33 +15,21 @@ define('share', function() {
 			return false;
 		}
 
-		$('#content').off('shown.bs.dropdown', '.share-dropdown').on('shown.bs.dropdown', '.share-dropdown', function() {
-
-			var postLink = $(this).find('.post-link');
-			postLink.val(baseUrl + getPostUrl($(this)));
-
-			// without the setTimeout can't select the text in the input
-			setTimeout(function() {
-				postLink.putCursorAtEnd().select();
-			}, 50);
-		});
-
 		addHandler('.post-link', function(e) {
 			e.preventDefault();
 			return false;
 		});
 
-		addHandler('.twitter-share', function () {
-			return openShare('https://twitter.com/intent/tweet?text=' + name + '&url=', getPostUrl($(this)), 550, 420);
-		});
-
-		addHandler('.facebook-share', function () {
-			return openShare('https://www.facebook.com/sharer/sharer.php?u=', getPostUrl($(this)), 626, 436);
-		});
-
-		addHandler('.google-share', function () {
-			return openShare('https://plus.google.com/share?url=', getPostUrl($(this)), 500, 570);
-		});
+        addHandler('.weibo-share', function () {
+            var url = encodeURIComponent(baseUrl + getPostUrl($(this)));
+            var element = $(this).parents('.post-row').find('[itemprop=name]');
+            var title = element && element.text() ? element.text() : $(this).parents('.post-row').find('[itemprop=text]').text()
+            if(!title){
+                title = '分享最专业的Swift开发者社区 '+ $('.active').find('[itemprop=title]').text() +' 版块';
+            }
+            var share_url = 'http://service.weibo.com/share/share.php?url='+url+'&title='+title+'&type=button&language=zh_cn&appkey=2004330677&style=number&ralateUid=5172806724'
+            window.open(share_url, '_blank','width=550,height=420,scrollbars=no,status=no');
+        });
 	};
 
 	function addHandler(selector, callback) {
