@@ -14,6 +14,7 @@
     "reply": "Responder",
     "edit": "Editar",
     "delete": "Deletar",
+    "purge": "Limpar",
     "restore": "Restaurar",
     "move": "Mover",
     "fork": "Clonar",
@@ -47,6 +48,8 @@
     "thread_tools.delete_confirm": "Tem certeza que deseja deletar este tópico?",
     "thread_tools.restore": "Restaurar Tópico",
     "thread_tools.restore_confirm": "Tem certeza que deseja restaurar este tópico?",
+    "thread_tools.purge": "Limpar Tópico",
+    "thread_tools.purge_confirm": "Deseja mesmo limpar esse tópico?",
     "topic_lock_success": "Tópico trancado com sucesso.",
     "topic_unlock_success": "Tópico destrancado com sucesso.",
     "topic_pin_success": "Tópico fixado com sucesso.",
@@ -54,8 +57,7 @@
     "topic_move_success": "Tópico movido com sucesso para %1",
     "post_delete_confirm": "Tem certeza que deseja deletar este post?",
     "post_restore_confirm": "Tem certeza que deseja restaurar este post?",
-    "post_delete_error": "Não foi possível deletar este post!",
-    "post_restore_error": "Não foi possível restaurar este post!",
+    "post_purge_confirm": "Deseja mesmo limpar essa postagem?",
     "load_categories": "Carregando Categorias",
     "disabled_categories_note": "Categorias desabilitadas estão em cinza",
     "confirm_move": "Mover",
@@ -91,5 +93,9 @@
     "composer.upload_instructions": "Mande suas imagens arrastando e soltando.",
     "more_users_and_guests": "%1 mais usuário(s) e %2 visitante(s)",
     "more_users": "%1 mais usuário(s)",
-    "more_guests": "%1 mais visitante(s)"
+    "more_guests": "%1 mais visitante(s)",
+    "sort_by": "Ordenar por",
+    "oldest_to_newest": "Mais Antigo para Recente",
+    "newest_to_oldest": "Recente para mais Antigo",
+    "most_votes": "Mais votados"
 }

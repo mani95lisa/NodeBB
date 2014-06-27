@@ -32,12 +32,12 @@ define('forum/topic/threadTools', ['forum/topic/fork', 'forum/topic/move'], func
 		});
 
 		$('.lock_thread').on('click', function() {
-			socket.emit(threadState.locked ? 'topics.unlock' : 'topics.lock', [tid]);
+			socket.emit(threadState.locked ? 'topics.unlock' : 'topics.lock', {tids: [tid], cid: ajaxify.variables.get('category_id')});
 			return false;
 		});
 
 		$('.pin_thread').on('click', function() {
-			socket.emit(threadState.pinned ? 'topics.unpin' : 'topics.pin', [tid]);
+			socket.emit(threadState.pinned ? 'topics.unpin' : 'topics.pin', {tids: [tid], cid: ajaxify.variables.get('category_id')});
 			return false;
 		});
 
@@ -78,7 +78,12 @@ define('forum/topic/threadTools', ['forum/topic/fork', 'forum/topic/move'], func
 
 				setFollowState(state);
 
-				app.alertSuccess(state ? '[[topic:following_topic.message]]' : '[[topic:not_following_topic.message]]');
+				app.alert({
+					alert_id: 'follow_thread',
+					message: state ? '[[topic:following_topic.message]]' : '[[topic:not_following_topic.message]]',
+					type: 'success',
+					timeout: 5000
+				});
 			});
 
 			return false;
@@ -89,7 +94,7 @@ define('forum/topic/threadTools', ['forum/topic/fork', 'forum/topic/move'], func
 		translator.translate('[[topic:thread_tools.' + command + '_confirm]]', function(msg) {
 			bootbox.confirm(msg, function(confirm) {
 				if (confirm) {
-					socket.emit('topics.' + command, [tid]);
+					socket.emit('topics.' + command, {tids: [tid], cid: ajaxify.variables.get('category_id')});
 				}
 			});
 		});
@@ -98,14 +103,20 @@ define('forum/topic/threadTools', ['forum/topic/fork', 'forum/topic/move'], func
 	ThreadTools.setLockedState = function(data) {
 		var threadEl = $('#post-container');
 		if (parseInt(data.tid, 10) === parseInt(threadEl.attr('data-tid'), 10)) {
+			var isLocked = data.isLocked && !app.isAdmin;
 			translator.translate('<i class="fa fa-fw fa-' + (data.isLocked ? 'un': '') + 'lock"></i> [[topic:thread_tools.' + (data.isLocked ? 'un': '') + 'lock]]', function(translated) {
 				$('.lock_thread').html(translated);
 			});
 
-			threadEl.find('.post_reply').html(data.isLocked ? 'Locked <i class="fa fa-lock"></i>' : 'Reply <i class="fa fa-reply"></i>');
-			threadEl.find('.quote, .edit, .delete').toggleClass('none', data.isLocked);
-			$('.topic-main-buttons .post_reply').attr('disabled', data.isLocked).html(data.isLocked ? 'Locked <i class="fa fa-lock"></i>' : 'Reply');
 
+			translator.translate(isLocked ? '[[topic:locked]]' : '[[topic:reply]]', function(translated) {
+				var className = isLocked ? 'fa-lock' : 'fa-reply';
+				threadEl.find('.post_reply').html('<i class="fa ' + className + '"></i> ' + translated);
+				$('.topic-main-buttons .post_reply').attr('disabled', isLocked).html(isLocked ? '<i class="fa fa-lock"></i> ' + translated : translated);
+			});
+
+			threadEl.find('.quote, .edit, .delete').toggleClass('none', isLocked);
+			$('.topic-title i.fa-lock').toggleClass('hide', !data.isLocked);
 			ThreadTools.threadState.locked = data.isLocked;
 		}
 	};
@@ -138,9 +149,9 @@ define('forum/topic/threadTools', ['forum/topic/fork', 'forum/topic/move'], func
 		if (parseInt(data.tid, 10) === parseInt(threadEl.attr('data-tid'), 10)) {
 			translator.translate('<i class="fa fa-fw fa-thumb-tack"></i> [[topic:thread_tools.' + (data.isPinned ? 'unpin' : 'pin') + ']]', function(translated) {
 				$('.pin_thread').html(translated);
-
 				ThreadTools.threadState.pinned = data.isPinned;
 			});
+			$('.topic-title i.fa-thumb-tack').toggleClass('hide', !data.isPinned);
 		}
 	}
 

@@ -2,6 +2,7 @@
 'use strict';
 
 var async = require('async'),
+	validator = require('validator'),
 	db = require('../database'),
 	utils = require('../../public/src/utils'),
 	plugins = require('../plugins'),
@@ -223,12 +224,14 @@ module.exports = function(Topics) {
 			},
 			function(result, next) {
 				Topics.pushUnreadCount();
-				posts.addUserInfoToPost(postData, next);
+				posts.getUserInfoForPost(postData, next);
 			},
-			function(postData, next) {
+			function(userInfo, next) {
+				postData.user = userInfo;
 				Topics.getTopicFields(tid, ['tid', 'title', 'slug'], next);
 			},
 			function(topicData, next) {
+				topicData.title = validator.escape(topicData.title);
 				postData.topic = topicData;
 				next();
 			},
@@ -236,7 +239,7 @@ module.exports = function(Topics) {
 				posts.getPidIndex(postData.pid, next);
 			},
 			function(index, next) {
-				postData.index = index;
+				postData.index = index - 1;
 				postData.favourited = false;
 				postData.votes = 0;
 				postData.display_moderator_tools = true;

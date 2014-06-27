@@ -62,7 +62,8 @@ middleware.addSlug = function(req, res, next) {
 			if (err || !slug || slug === id + '/') {
 				return next(err);
 			}
-			res.redirect(name + encodeURI(slug));
+			var url = name + encodeURI(slug);
+			res.locals.isAPI ? res.json(302, url) : res.redirect(url);
 		});
 	}
 
@@ -86,10 +87,33 @@ middleware.checkPostIndex = function(req, res, next) {
 		}
 		var postIndex = parseInt(req.params.post_index, 10);
 		postCount = parseInt(postCount, 10) + 1;
+		var url = '';
 		if (postIndex > postCount) {
-			return res.locals.isAPI ? res.json(302, '/topic/' + req.params.topic_id + '/' + req.params.slug + '/' + postCount) : res.redirect('/topic/' + req.params.topic_id + '/' + req.params.slug + '/' + postCount);
-		} else if (postIndex <= 1) {
-			return res.locals.isAPI ? res.json(302, '/topic/' + req.params.topic_id + '/' + req.params.slug) : res.redirect('/topic/' + req.params.topic_id + '/' + req.params.slug);
+			url = '/topic/' + req.params.topic_id + '/' + req.params.slug + '/' + postCount;
+			return res.locals.isAPI ? res.json(302, url) : res.redirect(url);
+		} else if (postIndex < 1) {
+			url = '/topic/' + req.params.topic_id + '/' + req.params.slug;
+			return res.locals.isAPI ? res.json(302, url) : res.redirect(url);
+		}
+		next();
+	});
+};
+
+middleware.checkTopicIndex = function(req, res, next) {
+	categories.getCategoryField(req.params.category_id, 'topic_count', function(err, topicCount) {
+		if (err) {
+			return next(err);
+		}
+		var topicIndex = parseInt(req.params.topic_index, 10);
+		topicCount = parseInt(topicCount, 10) + 1;
+		var url = '';
+		console.log(topicIndex, topicCount);
+		if (topicIndex > topicCount) {
+			url = '/category/' + req.params.category_id + '/' + req.params.slug + '/' + topicCount;
+			return res.locals.isAPI ? res.json(302, url) : res.redirect(url);
+		} else if (topicIndex < 1) {
+			url = '/category/' + req.params.category_id + '/' + req.params.slug;
+			return res.locals.isAPI ? res.json(302, url) : res.redirect(url);
 		}
 		next();
 	});
@@ -234,7 +258,7 @@ middleware.renderHeader = function(req, res, callback) {
 				csrf: res.locals.csrf_token,
 				navigation: custom_header.navigation,
 				allowRegistration: meta.config.allowRegistration === undefined || parseInt(meta.config.allowRegistration, 10) === 1,
-				searchEnabled: plugins.hasListeners('filter:search.query') && (uid || parseInt(meta.config.allowGuestSearching, 10) === 1)
+				searchEnabled: plugins.hasListeners('filter:search.query')
 			},
 			escapeList = {
 				'&': '&amp;',
@@ -281,7 +305,12 @@ middleware.renderHeader = function(req, res, callback) {
 				var parser = new (less.Parser)();
 
 				parser.parse(meta.config.customCSS, function(err, tree) {
-					next(err, tree ? tree.toCSS({cleancss: true}) : '');
+					if (!err) {
+						next(err, tree ? tree.toCSS({cleancss: true}) : '');
+					} else {
+						winston.error('[less] Could not convert custom LESS to CSS! Please check your syntax.');
+						next(undefined, '');
+					}
 				});
 			},
 			customJS: function(next) {

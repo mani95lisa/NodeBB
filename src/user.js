@@ -149,26 +149,37 @@ var bcrypt = require('bcryptjs'),
 	};
 
 	User.isReadyToPost = function(uid, callback) {
+		if (parseInt(uid, 10) === 0) {
+			return callback();
+		}
+
 		async.parallel({
 			userData: function(next) {
 				User.getUserFields(uid, ['banned', 'lastposttime', 'email', 'email:confirmed'], next);
 			},
 			exists: function(next) {
 				db.exists('user:' + uid, next);
+			},
+			isAdmin: function(next) {
+				User.isAdministrator(uid, next);
 			}
 		}, function(err, results) {
 			if (err) {
 				return callback(err);
 			}
 
+			if (!results.exists) {
+				return callback(new Error('[[error:no-user]]'));
+			}
+
+			if (results.isAdmin) {
+				return callback();
+			}
+
 			var userData = results.userData;
 
 			if (parseInt(userData.banned, 10) === 1) {
 				return callback(new Error('[[error:user-banned]]'));
-			}
-
-			if (!results.exists) {
-				return callback(new Error('[[error:no-user]]'));
 			}
 
 			if (userData.email && parseInt(meta.config.requireEmailConfirmation, 10) === 1 && parseInt(userData['email:confirmed'], 10) !== 1) {

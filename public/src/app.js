@@ -57,6 +57,7 @@ var socket,
 					app.cacheBuster = cacheBuster;
 
 					app.alert({
+						alert_id: 'forum_updated',
 						title: '[[global:updated.title]]',
 						message: '[[global:updated.message]]',
 						clickfn: function() {
@@ -108,7 +109,7 @@ var socket,
 				templates.setGlobal('loggedIn', parseInt(data.uid, 10) !== 0);
 
 				app.showLoginMessage();
-
+				app.replaceSelfLinks();
 				$(window).trigger('action:connected');
 			});
 
@@ -164,6 +165,10 @@ var socket,
 			}
 
 			app.cacheBuster = config['cache-buster'];
+
+			bootbox.setDefaults({
+				locale: config.defaultLang
+			});
 		}
 	}
 
@@ -228,34 +233,6 @@ var socket,
 		}
 	};
 
-	app.populateOnlineUsers = function () {
-		var uids = [];
-
-		$('.post-row').each(function () {
-			var uid = $(this).attr('data-uid');
-			if(uids.indexOf(uid) === -1) {
-				uids.push(uid);
-			}
-		});
-
-		socket.emit('user.getOnlineUsers', uids, function (err, users) {
-
-			$('.username-field').each(function (index, element) {
-				var el = $(this),
-					uid = el.parents('li').attr('data-uid');
-
-				if (uid && users[uid]) {
-					translator.translate('[[global:' + users[uid].status + ']]', function(translated) {
-						el.siblings('i')
-							.attr('class', 'fa fa-circle status ' + users[uid].status)
-							.attr('title', translated)
-							.attr('data-original-title', translated);
-					});
-				}
-			});
-		});
-	};
-
 	function highlightNavigationLink() {
 		var path = window.location.pathname,
 			parts = path.split('/'),
@@ -304,12 +281,9 @@ var socket,
 	};
 
 	app.processPage = function () {
-		app.populateOnlineUsers();
-
 		highlightNavigationLink();
 
 		$('span.timeago').timeago();
-		$('.post-content img').addClass('img-responsive');
 
 		utils.makeNumbersHumanReadable($('.human-readable-number'));
 
@@ -468,6 +442,14 @@ var socket,
 		}
 
 		searchButton.off().on('click', function(e) {
+			if (!config.isLoggedIn && !config.allowGuestSearching) {
+				app.alert({
+					message:'[[error:search-requires-login]]',
+					timeout: 3000
+				});
+				ajaxify.go('login');
+				return false;
+			}
 			e.stopPropagation();
 
 			searchFields.removeClass('hide').show();
@@ -510,13 +492,11 @@ var socket,
 
 	app.load = function() {
 		$('document').ready(function () {
-			var url = window.location.pathname.slice(1).replace(/\/$/, ""),
+			var url = ajaxify.removeRelativePath(window.location.pathname.slice(1).replace(/\/$/, "")),
+				tpl_url = ajaxify.getTemplateMapping(url),
 				search = window.location.search,
 				hash = window.location.hash,
-				tpl_url = ajaxify.getTemplateMapping(url),
 				$window = $(window);
-
-			url = ajaxify.removeRelativePath(url);
 
 			ajaxify.widgets.render(tpl_url, url);
 
@@ -564,4 +544,5 @@ var socket,
 
 	app.loadConfig();
 	app.alternatingTitle('');
+
 }());

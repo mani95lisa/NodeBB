@@ -1,8 +1,19 @@
 'use strict';
 
-var db = require('./database'),
+var async = require('async'),
+	path = require('path'),
+	fs = require('fs'),
+	nconf = require('nconf'),
+	validator = require('validator'),
+	winston = require('winston'),
+	gravatar = require('gravatar'),
+	S = require('string'),
+
+
+	db = require('./database'),
 	utils = require('./../public/src/utils'),
 	user = require('./user'),
+	groups = require('./groups'),
 	topics = require('./topics'),
 	favourites = require('./favourites'),
 	postTools = require('./postTools'),
@@ -10,20 +21,9 @@ var db = require('./database'),
 	categories = require('./categories'),
 	plugins = require('./plugins'),
 	meta = require('./meta'),
-	emitter = require('./emitter'),
-
-	async = require('async'),
-	path = require('path'),
-	fs = require('fs'),
-	nconf = require('nconf'),
-	validator = require('validator'),
-	winston = require('winston'),
-	gravatar = require('gravatar'),
-	S = require('string');
+	emitter = require('./emitter');
 
 (function(Posts) {
-	var customUserInfo = {};
-
 	require('./posts/delete')(Posts);
 
 	Posts.create = function(data, callback) {
@@ -188,13 +188,13 @@ var db = require('./database'),
 		});
 	};
 
-	Posts.addUserInfoToPost = function(post, callback) {
+	Posts.getUserInfoForPost = function(post, callback) {
 		user.getUserFields(post.uid, ['username', 'userslug', 'reputation', 'postcount', 'picture', 'signature', 'banned'], function(err, userData) {
 			if (err) {
 				return callback(err);
 			}
 
-			post.user = {
+			var userInfo = {
 				username: userData.username || '[[global:guest]]',
 				userslug: userData.userslug || '',
 				reputation: userData.reputation || 0,
@@ -203,38 +203,27 @@ var db = require('./database'),
 				picture: userData.picture || user.createGravatarURLFromEmail('')
 			};
 
-			for (var info in customUserInfo) {
-				if (customUserInfo.hasOwnProperty(info)) {
-					post.user[info] = userData[info] || customUserInfo[info];
-				}
-			}
-
 			async.parallel({
 				signature: function(next) {
-					if (parseInt(meta.config.disableSignatures, 10) !== 1) {
-						return postTools.parseSignature(userData.signature, next);
-					}
-					next();
-				},
-				editor: function(next) {
-					if (!post.editor) {
+					if (parseInt(meta.config.disableSignatures, 10) === 1) {
 						return next();
 					}
-					user.getUserFields(post.editor, ['username', 'userslug'], next);
+					postTools.parseSignature(userData.signature, next);
 				},
 				customProfileInfo: function(next) {
 					plugins.fireHook('filter:posts.custom_profile_info', {profile: [], uid: post.uid, pid: post.pid}, next);
+				},
+				groups: function(next) {
+					groups.getUserGroups(post.uid, next);
 				}
 			}, function(err, results) {
 				if (err) {
 					return callback(err);
 				}
-
-				post.user.signature = results.signature;
-				post.editor = results.editor;
-				post.custom_profile_info = results.profile;
-
-				callback(null, post);
+				userInfo.signature = results.signature;
+				userInfo.custom_profile_info = results.custom_profile_info;
+				userInfo.groups = results.groups;
+				callback(null, userInfo);
 			});
 		});
 	};
@@ -286,7 +275,7 @@ var db = require('./database'),
 				post.user = results.user;
 				post.topic = results.topicCategory.topic;
 				post.category = results.topicCategory.category;
-				post.index = parseInt(results.index, 10) + 1;
+				post.index = results.index;
 
 				if (stripTags) {
 					var s = S(results.content);
@@ -455,10 +444,13 @@ var db = require('./database'),
 			},
 			function(result, next) {
 				index = result;
+				if (index === 1) {
+					return callback(null, 1);
+				}
 				user.getSettings(uid, next);
 			},
 			function(settings, next) {
-				next(null, Math.ceil((index + 1) / settings.postsPerPage));
+				next(null, Math.ceil((index - 1) / settings.postsPerPage));
 			}
 		], callback);
 	};
@@ -470,17 +462,28 @@ var db = require('./database'),
 			}
 
 			db.sortedSetRank('tid:' + tid + ':posts', pid, function(err, index) {
-				callback(err, parseInt(index, 10) + 1);
+				if (!utils.isNumber(index)) {
+					return callback(err, 1);
+				}
+				callback(err, parseInt(index, 10) + 2);
 			});
 		});
 	};
 
 	Posts.isOwner = function(pid, uid, callback) {
 		Posts.getPostField(pid, 'uid', function(err, author) {
+			callback(err, parseInt(author, 10) === parseInt(uid, 10));
+		});
+	};
+
+	Posts.isMain = function(pid, callback) {
+		Posts.getPostField(pid, 'tid', function(err, tid) {
 			if (err) {
 				return callback(err);
 			}
-			callback(null, parseInt(author, 10) === parseInt(uid, 10));
+			topics.getTopicField(tid, 'mainPid', function(err, mainPid) {
+				callback(err, parseInt(pid, 10) === parseInt(mainPid, 10));
+			});
 		});
 	};
 

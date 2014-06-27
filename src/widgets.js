@@ -2,9 +2,10 @@
 
 var async = require('async'),
 	winston = require('winston'),
+	templates = require('templates.js'),
+	
 	plugins = require('./plugins'),
-	db = require('./database'),
-	templates = require('./../public/src/templates');
+	db = require('./database');
 
 
 (function(Widgets) {
@@ -80,8 +81,6 @@ var async = require('async'),
 
 	Widgets.reset = function(callback) {
 		var defaultAreas = [
-			{ name: 'Global Sidebar', template: 'global', location: 'sidebar' },
-			{ name: 'Global Header', template: 'global', location: 'header' },
 			{ name: 'Draft Zone', template: 'global', location: 'drafts' }
 		];
 

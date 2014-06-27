@@ -297,7 +297,7 @@ var async = require('async'),
 							if (err) {
 								return next(err);
 							}
-							if (!Array.isArray(postData) || !postData.length) {
+							if (!Array.isArray(postData) || !postData[0]) {
 								return next(null, []);
 							}
 							postData[0].index = 0;
@@ -367,7 +367,7 @@ var async = require('async'),
 				}
 
 				results.postData.timestamp = utils.toISOString(results.postData.timestamp);
-				results.postData.index = parseInt(results.postIndex, 10) + 1;
+				results.postData.index = results.postIndex;
 
 				callback(null, results.postData);
 			});
@@ -392,6 +392,12 @@ var async = require('async'),
 				return callback(err);
 			}
 			callback(null, parseInt(locked, 10) === 1);
+		});
+	};
+
+	Topics.isOwner = function(tid, uid, callback) {
+		Topics.getTopicField(tid, 'uid', function(err, author) {
+			callback(err, parseInt(author, 10) === parseInt(uid, 10));
 		});
 	};
 
@@ -425,16 +431,5 @@ var async = require('async'),
 			});
 		});
 	};
-
-	Topics.updateTopicCount = function(callback) {
-		db.sortedSetCard('topics:recent', function(err, count) {
-			if(err) {
-				return callback(err);
-			}
-
-			db.setObjectField('global', 'topicCount', count, callback);
-		});
-	};
-
 
 }(exports));

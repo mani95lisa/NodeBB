@@ -4,9 +4,9 @@
 var async = require('async'),
 	winston = require('winston'),
 
-	db = require('./../database'),
-	posts = require('./../posts'),
-	topics = require('./../topics');
+	db = require('../database'),
+	posts = require('../posts'),
+	topics = require('../topics');
 
 module.exports = function(Categories) {
 	Categories.getRecentReplies = function(cid, uid, count, callback) {
@@ -35,13 +35,24 @@ module.exports = function(Categories) {
 			], next);
 		}
 
-		topics.getPids(tid, function(err, pids) {
+		updatePostCount(tid, oldCid, cid);
+		async.parallel({
+			mainPid: function(next) {
+				topics.getTopicField(tid, 'mainPid', next);
+			},
+			pids: function(next) {
+				topics.getPids(tid, next);
+			}
+		}, function(err, results) {
 			if (err) {
 				return winston.error(err.message);
 			}
-			if (pids && !pids.length) {
+
+			if (!results.mainPid && results.pids && !results.pids.length) {
 				return;
 			}
+
+			var pids = [results.mainPid].concat(results.pids);
 
 			var keys = pids.map(function(pid) {
 				return 'post:' + pid;
@@ -60,6 +71,27 @@ module.exports = function(Categories) {
 			});
 		});
 	};
+
+	function updatePostCount(tid, oldCid, newCid) {
+		topics.getTopicField(tid, 'postcount', function(err, postCount) {
+			if (err) {
+				return winston.error(err.message);
+			}
+
+			async.parallel([
+				function(next) {
+					db.incrObjectFieldBy('category:' + oldCid, 'post_count', -postCount, next);
+				},
+				function(next) {
+					db.incrObjectFieldBy('category:' + newCid, 'post_count', postCount, next);
+				}
+			], function(err) {
+				if (err) {
+					winston.error(err.message);
+				}
+			});
+		});
+	}
 };
 
 

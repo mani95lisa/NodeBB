@@ -1,7 +1,7 @@
 
 'use strict';
 
-/* globals app, ajaxify, define, socket */
+/* globals app, ajaxify, define, socket, translator */
 
 define('forum/topic/events', ['forum/topic/browsing', 'forum/topic/postTools', 'forum/topic/threadTools'], function(browsing, postTools, threadTools) {
 
@@ -17,11 +17,11 @@ define('forum/topic/events', ['forum/topic/browsing', 'forum/topic/postTools', '
 		'event:topic_restored': toggleTopicDeleteState,
 		'event:topic_purged': onTopicPurged,
 
-		'event:topic_locked': toggleTopicLockedState,
-		'event:topic_unlocked': toggleTopicLockedState,
+		'event:topic_locked': threadTools.setLockedState,
+		'event:topic_unlocked': threadTools.setLockedState,
 
-		'event:topic_pinned': toggleTopicPinnedState,
-		'event:topic_unpinned': toggleTopicPinnedState,
+		'event:topic_pinned': threadTools.setPinnedState,
+		'event:topic_unpinned': threadTools.setPinnedState,
 
 		'event:topic_moved': onTopicMoved,
 
@@ -75,19 +75,7 @@ define('forum/topic/events', ['forum/topic/browsing', 'forum/topic/postTools', '
 	}
 
 	function onTopicPurged(tid) {
-		ajaxify.refresh();
-	}
-
-	function toggleTopicLockedState(data) {
-		threadTools.setLockedState(data);
-
-		app.alertSuccess(data.isLocked ? '[[topic:topic_lock_success]]' : '[[topic:topic_unlock_success]]');
-	}
-
-	function toggleTopicPinnedState(data) {
-		threadTools.setPinnedState(data);
-
-		app.alertSuccess(data.isPinned ? '[[topic:topic_pin_success]]' : '[[topic:topic_unpin_success]]');
+		ajaxify.go('category/' + ajaxify.variables.get('category_id'));
 	}
 
 	function onTopicMoved(data) {
@@ -110,6 +98,7 @@ define('forum/topic/events', ['forum/topic/browsing', 'forum/topic/postTools', '
 		editedPostEl.fadeOut(250, function() {
 			editedPostEl.html(data.content);
 			editedPostEl.find('img').addClass('img-responsive');
+			app.replaceSelfLinks(editedPostEl.find('a'));
 			editedPostEl.fadeIn(250);
 		});
 	}

@@ -10,7 +10,9 @@ var async = require('async'),
 	db = require('../database'),
 	notifications = require('../notifications'),
 	posts = require('../posts'),
-	topics = require('../topics');
+	postTools = require('../postTools'),
+	topics = require('../topics'),
+	privileges = require('../privileges');
 
 (function(UserNotifications) {
 	UserNotifications.get = function(uid, callback) {
@@ -153,32 +155,36 @@ var async = require('async'),
 			}
 
 			async.parallel({
-				username: function(next) {
-					user.getUserField(uid, 'username', next);
-				},
-				slug: function(next) {
-					topics.getTopicField(tid, 'slug', next);
-				},
-				postIndex: function(next) {
-					posts.getPidIndex(pid, next);
+				username: async.apply(user.getUserField, uid, 'username'),
+				topic: async.apply(topics.getTopicFields, tid, ['slug', 'cid']),
+				postIndex: async.apply(posts.getPidIndex, pid),
+				postContent: function(next) {
+					async.waterfall([
+						async.apply(posts.getPostField, pid, 'content'),
+						function(content, next) {
+							postTools.parse(content, next);
+						}
+					], next);
 				}
 			}, function(err, results) {
 				if (err) {
 					return;
 				}
 
-				var message = '[[notifications:user_made_post, ' + results.username + ']]';
-				var path = nconf.get('relative_path') + '/topic/' + results.slug;
-				if (parseInt(results.postIndex, 10)) {
-					path += '/' + (parseInt(results.postIndex, 10) + 1);
-				}
 				notifications.create({
-					text: message,
-					path: path,
+					bodyShort: '[[notifications:user_made_post, ' + results.username + ']]',
+					bodyLong: results.postContent,
+					path: nconf.get('relative_path') + '/topic/' + results.topic.slug + '/' + results.postIndex,
 					uniqueId: 'topic:' + tid,
 					from: uid
 				}, function(nid) {
-					notifications.push(nid, followers);
+					async.filter(followers, function(uid, next) {
+						privileges.categories.can('read', results.topic.cid, uid, function(err, canRead) {
+							next(!err && canRead);
+						});
+					}, function(followers){
+						notifications.push(nid, followers);
+					});
 				});
 			});
 		});

@@ -27,7 +27,7 @@ define('share', function() {
             if(!title){
                 title = '分享最专业的Swift开发者社区 '+ $('.active').find('[itemprop=title]').text() +' 版块';
             }
-            var share_url = 'http://service.weibo.com/share/share.php?url='+url+'&title='+title+'&type=button&language=zh_cn&appkey=2004330677&style=number&ralateUid=5172806724'
+            var share_url = 'http://service.weibo.com/share/share.php?url='+url+'&title='+title+'&type=button&language=zh_cn&searchPic=true&appkey=2004330677&style=number&ralateUid=5172806724'
             window.open(share_url, '_blank','width=550,height=420,scrollbars=no,status=no');
         });
 	};

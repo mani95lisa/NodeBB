@@ -4,6 +4,7 @@
 var async = require('async'),
 
 	posts = require('../posts'),
+	topics = require('../topics'),
 	user = require('../user'),
 	helpers = require('./helpers'),
 	groups = require('../groups'),
@@ -64,29 +65,49 @@ module.exports = function(privileges) {
 	privileges.posts.canEdit = function(pid, uid, callback) {
 		helpers.some([
 			function(next) {
-				posts.isOwner(pid, uid, next);
-			},
-			function(next) {
-				helpers.hasEnoughReputationFor('privileges:manage_content', uid, next);
-			},
-			function(next) {
-				helpers.hasEnoughReputationFor('privileges:manage_topic', uid, next);
-			},
-			function(next) {
-				posts.getCidByPid(pid, function(err, cid) {
-					if (err) {
-						return next(err);
+				isPostTopicLocked(pid, function(err, isLocked) {
+					if (err || isLocked) {
+						return next(err, false);
 					}
-					user.isModerator(uid, cid, next);
+
+					helpers.some([
+						function(next) {
+							posts.isOwner(pid, uid, next);
+						},
+						function(next) {
+							helpers.hasEnoughReputationFor('privileges:manage_content', uid, next);
+						},
+						function(next) {
+							helpers.hasEnoughReputationFor('privileges:manage_topic', uid, next);
+						}
+					], next);
 				});
 			},
 			function(next) {
-				user.isAdministrator(uid, next);
+				isAdminOrMod(pid, uid, next);
 			}
 		], callback);
 	};
 
 	privileges.posts.canMove = function(pid, uid, callback) {
+		posts.isMain(pid, function(err, isMain) {
+			if (err || isMain) {
+				return callback(err || new Error('[[error:cant-move-mainpost]]'));
+			}
+			isAdminOrMod(pid, uid, callback);
+		});
+	};
+
+	function isPostTopicLocked(pid, callback) {
+		posts.getPostField(pid, 'tid', function(err, tid) {
+			if (err) {
+				return callback(err);
+			}
+			topics.isLocked(tid, callback);
+		});
+	}
+
+	function isAdminOrMod(pid, uid, callback) {
 		helpers.some([
 			function(next) {
 				posts.getCidByPid(pid, function(err, cid) {
@@ -100,5 +121,5 @@ module.exports = function(privileges) {
 				user.isAdministrator(uid, next);
 			}
 		], callback);
-	};
+	}
 };

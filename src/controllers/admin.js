@@ -122,7 +122,7 @@ adminController.themes.get = function(req, res, next) {
 			plugins.fireHook('filter:widgets.getWidgets', [], next);
 		}
 	}, function(err, widgetData) {
-		widgetData.areas.push({ name: 'Drafts', template: 'global', location: 'drafts' });
+		widgetData.areas.push({ name: 'Draft Zone', template: 'global', location: 'drafts' });
 
 		async.each(widgetData.areas, function(area, next) {
 			widgets.getArea(area.template, area.location, function(err, areaData) {
@@ -184,6 +184,9 @@ adminController.groups.get = function(req, res, next) {
 		showSystemGroups: true,
 		truncateUserList: true
 	}, function(err, groups) {
+		groups = groups.filter(function(group) {
+			return group.name !== 'registered-users' && group.name !== 'guests';
+		});
 		res.render('admin/groups', {
 			groups: groups,
 			yourid: req.user.uid

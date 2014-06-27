@@ -38,7 +38,7 @@ Executed whenever a post is retrieved, but before being sent to the client.
 ``filter:register.build``
 ^^^^^^^^^^^^^^^^^^^^^
 
-**Argument(s)**: 
+**Argument(s)**:
  - `req` the express request object (javascript Object)
  - `res` the express response object (javascript Object)
  - `data` the data passed to the template (javascript Object)
@@ -62,7 +62,7 @@ Executed when a post or signature needs to be parsed from raw text to HTML (for 
 ``filter:register.check``
 ^^^^^^^^^^^^^^^^^^^^^
 
-**Argument(s)**: 
+**Argument(s)**:
  - `req` the express request object (javascript Object)
  - `res` the express response object (javascript Object)
  - `userData` the user data parsed from the form
@@ -116,6 +116,9 @@ Executed when a post or signature needs to be parsed from raw text to HTML (for 
 ^^^^^^^^^^^^^^^^^^^^^
 
 ``filter:user.create``
+^^^^^^^^^^^^^^^^^^^^^
+
+``filter:user.profileLinks``
 ^^^^^^^^^^^^^^^^^^^^^
 
 ``filter:user.verify.code``
@@ -203,6 +206,13 @@ Executed whenever a post is created or edited, after it is saved into the databa
 ``action:post.restore``
 ^^^^^^^^^^^^^^^^^^^^^
 
+``action:notification.pushed``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**Argument(s)**: A notification object (javascript Object)
+
+Executed whenever a notification is pushed to a user.
+
 ``action:config.set``
 ^^^^^^^^^^^^^^^^^^^^^
 
@@ -232,3 +242,57 @@ Parameters: hash (str), object (obj)
 Useful if your plugins want to cache settings instead of pulling from DB everytime a method is called. Listen to this and refresh accordingly.
 
 
+Client Side Hooks
+--------------------
+
+``filter:categories.new_topic``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+
+``action:popstate``
+^^^^^^^^^^^^^^^^^^^
+
+``action:ajaxify.start``
+^^^^^^^^^^^^^^^^^^^
+
+``action:ajaxify.loadingTemplates``
+^^^^^^^^^^^^^^^^^^^
+
+``action:ajaxify.loadingData``
+^^^^^^^^^^^^^^^^^^^
+
+``action:ajaxify.contentLoaded``
+^^^^^^^^^^^^^^^^^^^
+
+``action:ajaxify.end``
+^^^^^^^^^^^^^^^^^^^
+
+``action:reconnected``
+^^^^^^^^^^^^^^^^^^^
+
+``action:connected``
+^^^^^^^^^^^^^^^^^^^
+
+``action:disconnected``
+^^^^^^^^^^^^^^^^^^^
+
+``action:categories.loading``
+^^^^^^^^^^^^^^^^^^^
+
+``action:categories.loaded``
+^^^^^^^^^^^^^^^^^^^
+
+``action:categories.new_topic.loaded``
+^^^^^^^^^^^^^^^^^^^
+
+``action:topic.loading``
+^^^^^^^^^^^^^^^^^^^
+
+``action:topic.loaded``
+^^^^^^^^^^^^^^^^^^^
+
+``action:composer.loaded``
+^^^^^^^^^^^^^^^^^^^
+
+``action:widgets.loaded``
+^^^^^^^^^^^^^^^^^^^

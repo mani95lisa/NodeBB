@@ -3,11 +3,20 @@
 
 /* globals define, app, templates, translator, socket, bootbox, config, ajaxify, RELATIVE_PATH, utils */
 
-define('forum/topic', ['forum/pagination', 'forum/infinitescroll', 'forum/topic/threadTools', 'forum/topic/postTools', 'forum/topic/events', 'navigator'], function(pagination, infinitescroll, threadTools, postTools, events, navigator) {
-	var	Topic = {},
-		scrollingToPost = false,
-		currentUrl = '';
+var dependencies = [
+	'forum/pagination',
+	'forum/infinitescroll',
+	'forum/topic/threadTools',
+	'forum/topic/postTools',
+	'forum/topic/events',
+	'forum/topic/scrollTo',
+	'forum/topic/browsing',
+	'navigator'
+];
 
+define('forum/topic', dependencies, function(pagination, infinitescroll, threadTools, postTools, events, scrollTo, browsing, navigator) {
+	var	Topic = {},
+		currentUrl = '';
 
 	$(window).on('action:ajaxify.start', function(ev, data) {
 		if(data.url.indexOf('topic') !== 0) {
@@ -34,6 +43,9 @@ define('forum/topic', ['forum/pagination', 'forum/infinitescroll', 'forum/topic/
 
 		app.enterRoom('topic_' + tid);
 
+		browsing.populateOnlineUsers();
+		$('.post-content img').addClass('img-responsive');
+
 		showBottomPostBar();
 
 		postTools.init(tid, thread_state);
@@ -48,24 +60,7 @@ define('forum/topic', ['forum/pagination', 'forum/infinitescroll', 'forum/topic/
 
 		addBlockquoteEllipses($('.topic .post-content > blockquote'));
 
-		var bookmark = localStorage.getItem('topic:' + tid + ':bookmark');
-		var postIndex = getPostIndex();
-		if (postIndex) {
-			Topic.scrollToPost(postIndex, true);
-		} else if (bookmark && (!config.usePagination || (config.usePagination && pagination.currentPage === 1)) && postCount > 1) {
-			app.alert({
-				alert_id: 'bookmark',
-				message: '[[topic:bookmark_instructions]]',
-				timeout: 0,
-				type: 'info',
-				clickfn : function() {
-					Topic.scrollToPost(parseInt(bookmark, 10), true);
-				},
-				closefn : function() {
-					localStorage.removeItem('topic:' + tid + ':bookmark');
-				}
-			});
-		}
+		handleBookmark(tid);
 
 		navigator.init('.posts > .post-row', postCount, Topic.navigatorCallback);
 
@@ -78,6 +73,32 @@ define('forum/topic', ['forum/pagination', 'forum/infinitescroll', 'forum/topic/
 		socket.emit('topics.markAsRead', tid);
 		socket.emit('topics.increaseViewCount', tid);
 	};
+
+	function handleBookmark(tid) {
+		var bookmark = localStorage.getItem('topic:' + tid + ':bookmark');
+		var postIndex = getPostIndex();
+		if (postIndex) {
+			scrollTo.scrollToPost(postIndex - 1, true);
+		} else if (bookmark && (!config.usePagination || (config.usePagination && pagination.currentPage === 1)) && ajaxify.variables.get('postcount') > 1) {
+			app.alert({
+				alert_id: 'bookmark',
+				message: '[[topic:bookmark_instructions]]',
+				timeout: 0,
+				type: 'info',
+				clickfn : function() {
+					scrollTo.scrollToPost(parseInt(bookmark, 10), true);
+				},
+				closefn : function() {
+					localStorage.removeItem('topic:' + tid + ':bookmark');
+				}
+			});
+		}
+	}
+
+	function getPostIndex() {
+		var parts = window.location.pathname.split('/');
+		return parts[4] ? parseInt(parts[4], 10) : 0;
+	}
 
 	function handleSorting() {
 		var threadSort = $('.thread-sort');
@@ -92,11 +113,6 @@ define('forum/topic', ['forum/pagination', 'forum/infinitescroll', 'forum/topic/
 				ajaxify.go('topic/' + ajaxify.variables.get('topic_slug'));
 			});
 		});
-	}
-
-	function getPostIndex() {
-		var parts = window.location.pathname.split('/');
-		return parts[4] ? (parseInt(parts[4], 10) - 1) : '';
 	}
 
 	function showBottomPostBar() {
@@ -128,12 +144,17 @@ define('forum/topic', ['forum/pagination', 'forum/infinitescroll', 'forum/topic/
 		blockquotes.each(function() {
 			var $this = $(this);
 			if ($this.find(':hidden').length && !$this.find('.toggle').length) {
-				$this.append('<i class="fa fa-ellipsis-h pointer toggle"></i>');
+				$this.append('<i class="fa fa-angle-down pointer toggle"></i>');
 			}
 		});
 
-		$('blockquote .toggle').on('click', function() {
-			$(this).parent('blockquote').toggleClass('uncollapsed');
+		$('#post-container').on('click', 'blockquote .toggle', function() {
+			var blockQuote = $(this).parent('blockquote');
+			var toggle = $(this);
+			blockQuote.toggleClass('uncollapsed');
+			var collapsed = !blockQuote.hasClass('uncollapsed');
+			toggle.toggleClass('fa-angle-down', collapsed).toggleClass('fa-angle-up', !collapsed);
+
 		});
 	}
 
@@ -172,7 +193,7 @@ define('forum/topic', ['forum/pagination', 'forum/infinitescroll', 'forum/topic/
 			app.removeAlert('bookmark');
 		}
 
-		if (!scrollingToPost) {
+		if (!scrollTo.active) {
 			var parts = ajaxify.removeRelativePath(window.location.pathname.slice(1)).split('/');
 			var topicId = parts[1],
 				slug = parts[2];
@@ -189,84 +210,6 @@ define('forum/topic', ['forum/pagination', 'forum/infinitescroll', 'forum/topic/
 					}, null, window.location.protocol + '//' + window.location.host + RELATIVE_PATH + '/' + newUrl + search);
 				}
 				currentUrl = newUrl;
-			}
-		}
-	};
-
-	Topic.scrollToPost = function(postIndex, highlight, duration, offset) {
-		if (!postIndex) {
-			return;
-		}
-
-		if (!offset) {
-			offset = 0;
-		}
-
-		scrollingToPost = true;
-
-		if($('#post_anchor_' + postIndex).length) {
-			return scrollToPid(postIndex);
-		}
-
-		if(config.usePagination) {
-			if (window.location.search.indexOf('page') !== -1) {
-				navigator.update();
-				scrollingToPost = false;
-				return;
-			}
-
-			var page = Math.ceil((postIndex + 1) / config.postsPerPage)
-
-			if(parseInt(page, 10) !== pagination.currentPage) {
-				pagination.loadPage(page, function() {
-					scrollToPid(postIndex);
-				});
-			} else {
-				scrollToPid(postIndex);
-			}
-		} else {
-			$('#post-container').empty();
-			var after = postIndex - config.postsPerPage + 1;
-			if(after < 0) {
-				after = 0;
-			}
-			loadPostsAfter(after, function() {
-				scrollToPid(postIndex);
-			});
-		}
-
-		function scrollToPid(postIndex) {
-			var scrollTo = $('#post_anchor_' + postIndex),
-				tid = $('#post-container').attr('data-tid');
-
-			function animateScroll() {
-				$('html, body').animate({
-					scrollTop: (scrollTo.offset().top - $('#header-menu').height() - offset) + 'px'
-				}, duration !== undefined ? duration : 400, function() {
-					scrollingToPost = false;
-					navigator.update();
-					highlightPost();
-					$('body').scrollTop($('body').scrollTop() - 1);
-					$('html').scrollTop($('html').scrollTop() - 1);
-				});
-			}
-
-			function highlightPost() {
-				if (highlight) {
-					scrollTo.parent().find('.topic-item').addClass('highlight');
-					setTimeout(function() {
-						scrollTo.parent().find('.topic-item').removeClass('highlight');
-					}, 5000);
-				}
-			}
-
-			if (tid && scrollTo.length) {
-				if($('#post-container li.post-row[data-index="' + postIndex + '"]').attr('data-index') !== '0') {
-					animateScroll();
-				} else {
-					navigator.update();
-					highlightPost();
-				}
 			}
 		}
 	};
@@ -341,7 +284,7 @@ define('forum/topic', ['forum/pagination', 'forum/infinitescroll', 'forum/topic/
 
 		findInsertionPoint();
 
-		data.title = ajaxify.variables.get('topic_name');
+		data.title = $('<div></div>').text(ajaxify.variables.get('topic_name')).html();
 		data.viewcount = ajaxify.variables.get('viewcount');
 
 		infinitescroll.parseAndTranslate('topic', 'posts', data, function(html) {
@@ -357,6 +300,7 @@ define('forum/topic', ['forum/pagination', 'forum/infinitescroll', 'forum/topic/
 
 			addBlockquoteEllipses(html.find('.post-content > blockquote'));
 
+			$(window).trigger('action:posts.loaded');
 			onNewPostsLoaded(html, data.posts);
 			if (typeof callback === 'function') {
 				callback();
@@ -378,8 +322,9 @@ define('forum/topic', ['forum/pagination', 'forum/infinitescroll', 'forum/topic/
 			getPostPrivileges(posts[x].pid);
 		}
 
-		app.populateOnlineUsers();
+		browsing.populateOnlineUsers();
 		app.createUserTooltips();
+		app.replaceSelfLinks(html.find('a'));
 		utils.addCommasToNumbers(html.find('.formatted-number'));
 		utils.makeNumbersHumanReadable(html.find('.human-readable-number'));
 		html.find('span.timeago').timeago();
@@ -397,14 +342,14 @@ define('forum/topic', ['forum/pagination', 'forum/infinitescroll', 'forum/topic/
 	}
 
 	function loadMorePosts(direction) {
-		if (!$('#post-container').length || scrollingToPost) {
+		if (!$('#post-container').length || scrollTo.active) {
 			return;
 		}
 
 		infinitescroll.calculateAfter(direction, '#post-container .post-row[data-index!="0"]', config.postsPerPage, function(after, offset, el) {
 			loadPostsAfter(after, function() {
 				if (direction < 0 && el) {
-					Topic.scrollToPost(el.attr('data-index'), false, 0, offset);
+					scrollTo.scrollToPost(el.attr('data-index'), false, 0, offset);
 				}
 			});
 		});

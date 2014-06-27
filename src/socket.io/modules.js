@@ -61,8 +61,8 @@ SocketModules.composer.push = function(socket, pid, callback) {
 			tags: function(next) {
 				topics.getTopicTags(postData.tid, next);
 			},
-			index: function(next) {
-				posts.getPidIndex(pid, next);
+			isMain: function(next) {
+				posts.isMain(pid, next);
 			}
 		}, function(err, results) {
 			if(err) {
@@ -75,22 +75,16 @@ SocketModules.composer.push = function(socket, pid, callback) {
 				title: results.topic.title,
 				topic_thumb: results.topic.thumb,
 				tags: results.tags,
-				index: results.index
+				isMain: results.isMain
 			});
 		});
 	});
 };
 
 SocketModules.composer.editCheck = function(socket, pid, callback) {
-	posts.getPostField(pid, 'tid', function(err, tid) {
-		if (err) {
-			return callback(err);
-		}
-
-		postTools.isMain(pid, tid, function(err, isMain) {
-			callback(err, {
-				titleEditable: isMain
-			});
+	posts.isMain(pid, function(err, isMain) {
+		callback(err, {
+			titleEditable: isMain
 		});
 	});
 };
@@ -186,7 +180,7 @@ SocketModules.chats.send = function(socket, data, callback) {
 			return callback(err);
 		}
 
-		sendChatNotification(socket.uid, touid, message.fromUser.username);
+		sendChatNotification(socket.uid, touid, message.fromUser.username, message);
 
 		server.getUserSockets(touid).forEach(function(s) {
 			s.emit('event:chats.receive', {
@@ -204,11 +198,12 @@ SocketModules.chats.send = function(socket, data, callback) {
 	});
 };
 
-function sendChatNotification(fromuid, touid, username) {
+function sendChatNotification(fromuid, touid, username, message) {
 	if (!module.parent.exports.isUserOnline(touid)) {
 		var notifText = '[[notifications:new_message_from, ' + username + ']]';
 		notifications.create({
-			text: notifText,
+			bodyShort: notifText,
+			bodyLong: message,
 			path: 'javascript:app.openChat(&apos;' + username + '&apos;, ' + fromuid + ');',
 			uniqueId: 'notification_' + fromuid + '_' + touid,
 			from: fromuid

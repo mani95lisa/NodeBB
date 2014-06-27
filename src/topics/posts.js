@@ -4,10 +4,11 @@
 
 var async = require('async'),
 
-	db = require('./../database'),
-	emitter = require('./../emitter'),
-	favourites = require('./../favourites'),
-	posts = require('./../posts'),
+	db = require('../database'),
+	user = require('../user'),
+	emitter = require('../emitter'),
+	favourites = require('../favourites'),
+	posts = require('../posts'),
 	privileges = require('../privileges');
 
 module.exports = function(Topics) {
@@ -21,6 +22,7 @@ module.exports = function(Topics) {
 	emitter.on('event:newpost', Topics.onNewPostMade);
 
 	Topics.getTopicPosts = function(tid, set, start, end, uid, reverse, callback) {
+		callback = callback || function() {};
 		posts.getPostsByTid(tid, set, start, end, reverse, function(err, postData) {
 			if(err) {
 				return callback(err);
@@ -45,16 +47,36 @@ module.exports = function(Topics) {
 		});
 
 		async.parallel({
-			favourites : function(next) {
+			favourites: function(next) {
 				favourites.getFavouritesByPostIDs(pids, uid, next);
 			},
-			voteData : function(next) {
+			voteData: function(next) {
 				favourites.getVoteStatusByPostIDs(pids, uid, next);
 			},
-			userData : function(next) {
-				async.each(postData, posts.addUserInfoToPost, next);
+			userData: function(next) {
+				async.each(postData, function(post, next) {
+					async.parallel({
+						editor: function(next) {
+							if (!post.editor) {
+								return next();
+							}
+							user.getUserFields(post.editor, ['username', 'userslug'], next);
+						},
+						user: function(next) {
+							posts.getUserInfoForPost(post, next);
+						}
+					}, function(err, results) {
+						if (err) {
+							return next(err);
+						}
+
+						post.user = results.user;
+						post.editor = results.editor;
+						next();
+					});
+				}, next);
 			},
-			privileges : function(next) {
+			privileges: function(next) {
 				async.map(pids, function (pid, next) {
 					privileges.posts.get(pid, uid, next);
 				}, next);
@@ -71,7 +93,7 @@ module.exports = function(Topics) {
 				postData[i].downvoted = results.voteData[i].downvoted;
 				postData[i].votes = postData[i].votes || 0;
 				postData[i].display_moderator_tools = results.privileges[i].editable;
-				postData[i].display_move_tools = results.privileges[i].move;
+				postData[i].display_move_tools = results.privileges[i].move && postData[i].index !== 0;
 				postData[i].selfPost = parseInt(uid, 10) === parseInt(postData[i].uid, 10);
 
 				if(postData[i].deleted && !results.privileges[i].view_deleted) {

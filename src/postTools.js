@@ -18,16 +18,28 @@ var winston = require('winston'),
 
 (function(PostTools) {
 
-	PostTools.isMain = function(pid, tid, callback) {
-		topics.getTopicField(tid, 'mainPid', function(err, mainPid) {
-			callback(err, parseInt(pid, 10) === parseInt(mainPid, 10));
-		});
-	};
-
 	PostTools.edit = function(uid, pid, title, content, options, callback) {
 		options = options || {};
 
-		function success(postData) {
+		async.waterfall([
+			function (next) {
+				privileges.posts.canEdit(pid, uid, next);
+			},
+			function(canEdit, next) {
+				if (!canEdit) {
+					return next(new Error('[[error:no-privileges]]'));
+				}
+				posts.getPostData(pid, next);
+			},
+			function(postData, next) {
+				postData.content = content;
+				plugins.fireHook('filter:post.save', postData, next);
+			}
+		], function(err, postData) {
+			if (err) {
+				return callback(err);
+			}
+
 			posts.setPostFields(pid, {
 				edited: Date.now(),
 				editor: uid,
@@ -39,19 +51,22 @@ var winston = require('winston'),
 			async.parallel({
 				topic: function(next) {
 					var tid = postData.tid;
-					PostTools.isMain(pid, tid, function(err, isMainPost) {
+					posts.isMain(pid, function(err, isMainPost) {
 						if (err) {
 							return next(err);
 						}
 
 						if (isMainPost) {
 							title = title.trim();
-							var slug = tid + '/' + utils.slugify(title);
 
-							topics.setTopicField(tid, 'title', title);
-							topics.setTopicField(tid, 'slug', slug);
-
-							topics.setTopicField(tid, 'thumb', options.topic_thumb);
+							var topicData = {
+								title: title,
+								slug: tid + '/' + utils.slugify(title)
+							};
+							if (options.topic_thumb) {
+								topicData.thumb = options.topic_thumb;
+							}
+							db.setObject('topic:' + tid, topicData);
 
 							topics.updateTags(tid, options.tags);
 
@@ -72,27 +87,6 @@ var winston = require('winston'),
 					PostTools.parse(postData.content, next);
 				}
 			}, callback);
-		}
-
-		privileges.posts.canEdit(pid, uid, function(err, canEdit) {
-			if (err || !canEdit) {
-				return callback(err || new Error('[[error:no-privileges]]'));
-			}
-
-			posts.getPostData(pid, function(err, postData) {
-				if (err) {
-					return callback(err);
-				}
-
-				postData.content = content;
-				plugins.fireHook('filter:post.save', postData, function(err, postData) {
-					if (err) {
-						return callback(err);
-					}
-
-					success(postData);
-				});
-			});
 		});
 	};
 
@@ -138,7 +132,7 @@ var winston = require('winston'),
 
 				db.incrObjectFieldBy('global', 'postCount', isDelete ? -1 : 1);
 
-				posts.getPostFields(pid, ['pid', 'tid', 'uid', 'content'], function(err, postData) {
+				posts.getPostFields(pid, ['pid', 'tid', 'uid', 'content', 'timestamp'], function(err, postData) {
 					if (err) {
 						return callback(err);
 					}
@@ -160,7 +154,7 @@ var winston = require('winston'),
 							updateTopicTimestamp(postData.tid, next);
 						},
 						function(next) {
-							addOrRemoveFromCategoryRecentPosts(pid, postData.tid, isDelete, next);
+							addOrRemoveFromCategory(pid, postData.tid, postData.timestamp, isDelete, next);
 						}
 					], function(err) {
 						if (!isDelete) {
@@ -206,23 +200,19 @@ var winston = require('winston'),
 		});
 	}
 
-	function addOrRemoveFromCategoryRecentPosts(pid, tid, isDelete, callback) {
+	function addOrRemoveFromCategory(pid, tid, timestamp, isDelete, callback) {
 		topics.getTopicField(tid, 'cid', function(err, cid) {
 			if (err) {
 				return callback(err);
 			}
 
-			posts.getPostField(pid, 'timestamp', function(err, timestamp) {
-				if (err) {
-					return callback(err);
-				}
+			db.incrObjectFieldBy('category:' + cid, 'post_count', isDelete ? -1 : 1);
 
-				if (isDelete) {
-					db.sortedSetRemove('categories:recent_posts:cid:' + cid, pid, callback);
-				} else {
-					db.sortedSetAdd('categories:recent_posts:cid:' + cid, timestamp, pid, callback);
-				}
-			});
+			if (isDelete) {
+				db.sortedSetRemove('categories:recent_posts:cid:' + cid, pid, callback);
+			} else {
+				db.sortedSetAdd('categories:recent_posts:cid:' + cid, timestamp, pid, callback);
+			}
 		});
 	}
 
