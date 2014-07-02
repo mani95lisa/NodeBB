@@ -150,6 +150,10 @@
 		db.isSetMember('group:' + groupName + ':members', uid, callback);
 	};
 
+	Groups.isMemberOfGroups = function(uid, groups, callback) {
+		db.isMemberOfSets(groups, uid, callback);
+	};
+
 	Groups.getMemberCount = function(groupName, callback) {
 		db.setCount('group:' + groupName + ':members', callback);
 	};
@@ -350,7 +354,7 @@
 
 				db.isMemberOfSets(groupSets, uid, function(err, isMembers) {
 					for(var i=isMembers.length - 1; i>=0; --i) {
-						if (parseInt(isMembers[i], 10) !== 1) {
+						if (!isMembers[i]) {
 							groupData.splice(i, 1);
 						}
 					}

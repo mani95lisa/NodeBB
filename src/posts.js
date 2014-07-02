@@ -188,43 +188,46 @@ var async = require('async'),
 		});
 	};
 
-	Posts.getUserInfoForPost = function(post, callback) {
-		user.getUserFields(post.uid, ['username', 'userslug', 'reputation', 'postcount', 'picture', 'signature', 'banned'], function(err, userData) {
+	Posts.getUserInfoForPosts = function(uids, callback) {
+		user.getMultipleUserFields(uids, ['uid', 'username', 'userslug', 'reputation', 'postcount', 'picture', 'signature', 'banned'], function(err, userData) {
 			if (err) {
 				return callback(err);
 			}
 
-			var userInfo = {
-				username: userData.username || '[[global:guest]]',
-				userslug: userData.userslug || '',
-				reputation: userData.reputation || 0,
-				postcount: userData.postcount || 0,
-				banned: parseInt(userData.banned, 10) === 1,
-				picture: userData.picture || user.createGravatarURLFromEmail('')
-			};
+			async.map(userData, function(userData, next) {
+				var userInfo = {
+					uid: userData.uid,
+					username: userData.username || '[[global:guest]]',
+					userslug: userData.userslug || '',
+					reputation: userData.reputation || 0,
+					postcount: userData.postcount || 0,
+					banned: parseInt(userData.banned, 10) === 1,
+					picture: userData.picture || user.createGravatarURLFromEmail('')
+				};
 
-			async.parallel({
-				signature: function(next) {
-					if (parseInt(meta.config.disableSignatures, 10) === 1) {
-						return next();
+				async.parallel({
+					signature: function(next) {
+						if (parseInt(meta.config.disableSignatures, 10) === 1) {
+							return next();
+						}
+						postTools.parseSignature(userData.signature, next);
+					},
+					customProfileInfo: function(next) {
+						plugins.fireHook('filter:posts.custom_profile_info', {profile: [], uid: userData.uid}, next);
+					},
+					groups: function(next) {
+						groups.getUserGroups(userData.uid, next);
 					}
-					postTools.parseSignature(userData.signature, next);
-				},
-				customProfileInfo: function(next) {
-					plugins.fireHook('filter:posts.custom_profile_info', {profile: [], uid: post.uid, pid: post.pid}, next);
-				},
-				groups: function(next) {
-					groups.getUserGroups(post.uid, next);
-				}
-			}, function(err, results) {
-				if (err) {
-					return callback(err);
-				}
-				userInfo.signature = results.signature;
-				userInfo.custom_profile_info = results.custom_profile_info;
-				userInfo.groups = results.groups;
-				callback(null, userInfo);
-			});
+				}, function(err, results) {
+					if (err) {
+						return next(err);
+					}
+					userInfo.signature = results.signature;
+					userInfo.custom_profile_info = results.custom_profile_info;
+					userInfo.groups = results.groups;
+					next(null, userInfo);
+				});
+			}, callback);
 		});
 	};
 
@@ -341,6 +344,14 @@ var async = require('async'),
 		});
 	};
 
+	Posts.getPostsFields = function(pids, fields, callback) {
+		var keys = pids.map(function(pid) {
+			return 'post:' + pid;
+		});
+
+		db.getObjectsFields(keys, fields, callback);
+	};
+
 	Posts.getPostField = function(pid, field, callback) {
 		Posts.getPostFields(pid, [field], function(err, data) {
 			if(err) {
@@ -375,6 +386,28 @@ var async = require('async'),
 					return callback(err || new Error('[[error:invalid-cid]]'));
 				}
 				callback(null, cid);
+			});
+		});
+	};
+
+	Posts.getCidsByPids = function(pids, callback) {
+		Posts.getPostsFields(pids, ['tid'], function(err, posts) {
+			if (err) {
+				return callback(err);
+			}
+
+			var tids = posts.map(function(post) {
+				return post.tid;
+			});
+
+			topics.getTopicsFields(tids, ['cid'], function(err, topics) {
+				if (err) {
+					return callback(err);
+				}
+				var cids = topics.map(function(topic) {
+					return topic.cid;
+				});
+				callback(null, cids);
 			});
 		});
 	};
@@ -471,9 +504,22 @@ var async = require('async'),
 	};
 
 	Posts.isOwner = function(pid, uid, callback) {
-		Posts.getPostField(pid, 'uid', function(err, author) {
-			callback(err, parseInt(author, 10) === parseInt(uid, 10));
-		});
+		uid = parseInt(uid, 10);
+		if (Array.isArray(pid)) {
+			Posts.getPostsFields(pid, ['uid'], function(err, posts) {
+				if (err) {
+					return callback(err);
+				}
+				posts = posts.map(function(post) {
+					return post && parseInt(post.uid, 10) === uid;
+				});
+				callback(null, posts);
+			});
+		} else {
+			Posts.getPostField(pid, 'uid', function(err, author) {
+				callback(err, parseInt(author, 10) === uid);
+			});
+		}
 	};
 
 	Posts.isMain = function(pid, callback) {

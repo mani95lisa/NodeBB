@@ -270,6 +270,9 @@ var async = require('async'),
 			}
 
 			async.parallel({
+				mainPost: function(next) {
+					Topics.getMainPost(tid, uid, next);
+				},
 				posts: function(next) {
 					Topics.getTopicPosts(tid, set, start, end, uid, reverse, next);
 				},
@@ -284,26 +287,6 @@ var async = require('async'),
 				},
 				tags: function(next) {
 					Topics.getTopicTagsObjects(tid, next);
-				},
-				mainPost: function(next) {
-					Topics.getTopicField(tid, 'mainPid', function(err, mainPid) {
-						if (err) {
-							return next(err);
-						}
-						if (!parseInt(mainPid, 10)) {
-							return next(null, []);
-						}
-						posts.getPostsByPids([mainPid], function(err, postData) {
-							if (err) {
-								return next(err);
-							}
-							if (!Array.isArray(postData) || !postData[0]) {
-								return next(null, []);
-							}
-							postData[0].index = 0;
-							Topics.addPostData(postData, uid, next);
-						});
-					});
 				}
 			}, function(err, results) {
 				if (err) {
@@ -321,6 +304,27 @@ var async = require('async'),
 				topicData.pinned = parseInt(topicData.pinned, 10) === 1;
 
 				callback(null, topicData);
+			});
+		});
+	};
+
+	Topics.getMainPost = function(tid, uid, callback) {
+		Topics.getTopicField(tid, 'mainPid', function(err, mainPid) {
+			if (err) {
+				return callback(err);
+			}
+			if (!parseInt(mainPid, 10)) {
+				return callback(null, []);
+			}
+			posts.getPostsByPids([mainPid], function(err, postData) {
+				if (err) {
+					return callback(err);
+				}
+				if (!Array.isArray(postData) || !postData[0]) {
+					return callback(null, []);
+				}
+				postData[0].index = 0;
+				Topics.addPostData(postData, uid, callback);
 			});
 		});
 	};
@@ -346,7 +350,7 @@ var async = require('async'),
 						if (err) {
 							return next(err);
 						} else if(!postData || !utils.isNumber(postData.uid)) {
-							return next(new Error('[[error:no-teaser]]'));
+							return callback();
 						}
 
 						user.getUserFields(postData.uid, ['username', 'userslug', 'picture'], function(err, userData) {
@@ -380,6 +384,13 @@ var async = require('async'),
 
 	Topics.getTopicFields = function(tid, fields, callback) {
 		db.getObjectFields('topic:' + tid, fields, callback);
+	};
+
+	Topics.getTopicsFields = function(tids, fields, callback) {
+		var keys = tids.map(function(tid) {
+			return 'topic:' + tid;
+		});
+		db.getObjectsFields(keys, fields, callback);
 	};
 
 	Topics.setTopicField = function(tid, field, value, callback) {
