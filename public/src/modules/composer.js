@@ -297,9 +297,7 @@ define('composer', dependencies, function(taskbar, controls, uploads, formatting
 		var titleEl = postContainer.find('.title');
 
 		if (parseInt(postData.tid, 10) > 0) {
-			translator.translate('[[topic:composer.replying_to, ' + postData.title + ']]', function(newTitle) {
-				titleEl.val(newTitle);
-			});
+			titleEl.translateVal('[[topic:composer.replying_to, ' + postData.title + ']]');
 			titleEl.prop('disabled', true);
 		} else if (parseInt(postData.pid, 10) > 0) {
 			titleEl.val(postData.title);
@@ -394,12 +392,35 @@ define('composer', dependencies, function(taskbar, controls, uploads, formatting
 		function done(err) {
 			$('.action-bar button').removeAttr('disabled');
 			if (err) {
+				if (err.message === '[[error:email-not-confirmed]]') {
+					return showEmailConfirmAlert(err);
+				}
+
 				return app.alertError(err.message);
 			}
 
 			discard(post_uuid);
 			drafts.removeDraft(postData.save_id);
 		}
+	}
+
+	function showEmailConfirmAlert(err) {
+		app.alert({
+			id: 'email_confirm',
+			title: '[[global:alert.error]]',
+			message: err.message,
+			type: 'danger',
+			timeout: 0,
+			clickfn: function() {
+				app.removeAlert('email_confirm');
+				socket.emit('user.emailConfirm', {}, function(err) {
+					if (err) {
+						return app.alertError(err.message);
+					}
+					app.alertSuccess('[[notifications:email-confirm-sent]]');
+				});
+			}
+		});
 	}
 
 	function discard(post_uuid) {

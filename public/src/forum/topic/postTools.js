@@ -22,11 +22,8 @@ define('forum/topic/postTools', ['composer', 'share', 'navigator'], function(com
 
 		postEl.find('.quote, .favourite, .post_reply, .chat').toggleClass('none', isDeleted);
 		postEl.find('.purge').toggleClass('none', !isDeleted);
-
-		translator.translate(isDeleted ? ' [[topic:restore]]' : ' [[topic:delete]]', function(translated) {
-			postEl.find('.delete').find('i').toggleClass('fa-trash-o', !isDeleted).toggleClass('fa-history', isDeleted);
-			postEl.find('.delete').find('span').html(translated);
-		});
+		postEl.find('.delete .i').toggleClass('fa-trash-o', !isDeleted).toggleClass('fa-history', isDeleted);
+		postEl.find('.delete span').translateHtml(isDeleted ? ' [[topic:restore]]' : ' [[topic:delete]]');
 	};
 
 	PostTools.updatePostCount = function() {
@@ -92,7 +89,7 @@ define('forum/topic/postTools', ['composer', 'share', 'navigator'], function(com
 
 		postContainer.on('click', '.purge', function(e) {
 			purgePost($(this), tid);
-		})
+		});
 
 		postContainer.on('click', '.move', function(e) {
 			openMovePostModal($(this));
