@@ -5,7 +5,8 @@ var async = require('async'),
 	posts = require('../posts'),
 	user = require('../user'),
 	topics = require('../topics'),
-	groups = require('../groups');
+	groups = require('../groups'),
+	plugins = require('../plugins');
 
 
 module.exports = function(User) {
@@ -105,6 +106,9 @@ module.exports = function(User) {
 				},
 				function(next) {
 					groups.leaveAllGroups(uid, next);
+				},
+				function(next) {
+					plugins.fireHook('filter:user.delete', uid, next);
 				}
 			], function(err) {
 				if (err) {

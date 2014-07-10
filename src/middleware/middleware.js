@@ -15,6 +15,7 @@ var app,
 	db = require('./../database'),
 	categories = require('./../categories'),
 	topics = require('./../topics'),
+	messaging = require('../messaging'),
 
 	controllers = {
 		api: require('./../controllers/api')
@@ -25,7 +26,7 @@ middleware.authenticate = function(req, res, next) {
 		if (res.locals.isAPI) {
 			return res.json(403, 'not-allowed');
 		} else {
-			return res.redirect('403');
+			return res.redirect(nconf.get('url') + '/403');
 		}
 	} else {
 		next();
@@ -188,6 +189,45 @@ middleware.checkAccountPermissions = function(req, res, next) {
 		});
 	});
 };
+
+/* Chat related middlewares */
+
+middleware.chat = {};
+middleware.chat.getMetadata = function(req, res, next) {
+	async.waterfall([
+		async.apply(user.getUidByUserslug, req.params.userslug),
+		function(toUid, next) {
+			user.getUserFields(toUid, ['uid', 'username'], next);
+		}
+	], function(err, chatData) {
+		if (!err) {
+			res.locals.chatData = chatData;
+		}
+
+		next();
+	});
+};
+
+middleware.chat.getContactList = function(req, res, next) {
+	user.getFollowing(req.user.uid, function(err, contacts) {
+		res.locals.contacts = contacts;
+		next();
+	});
+};
+
+middleware.chat.getMessages = function(req, res, next) {
+	if (res.locals.chatData) {
+		messaging.getMessages(req.user.uid, res.locals.chatData.uid, false, function(err, messages) {
+			res.locals.messages = messages;
+			next();
+		});
+	} else {
+		res.locals.messages = [];
+		next();
+	}
+};
+
+/* End Chat Middlewares */
 
 middleware.buildHeader = function(req, res, next) {
 	res.locals.renderHeader = true;

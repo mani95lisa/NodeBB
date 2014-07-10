@@ -28,18 +28,24 @@ var db = require('./database'),
 				touid: touid
 			};
 
-			db.setObject('message:' + mid, message, function(err) {
+			plugins.fireHook('filter:messaging.save', message, function(err, message) {
 				if (err) {
 					return callback(err);
 				}
 
-				db.listAppend('messages:' + uids[0] + ':' + uids[1], mid);
+				db.setObject('message:' + mid, message, function(err) {
+					if (err) {
+						return callback(err);
+					}
 
-				Messaging.updateChatTime(fromuid, touid);
-				Messaging.updateChatTime(touid, fromuid);
+					db.listAppend('messages:' + uids[0] + ':' + uids[1], mid);
 
-				getMessages([mid], fromuid, touid, true, function(err, messages) {
-					callback(err, messages ? messages[0] : null);
+					Messaging.updateChatTime(fromuid, touid);
+					Messaging.updateChatTime(touid, fromuid);
+
+					getMessages([mid], fromuid, touid, true, function(err, messages) {
+						callback(err, messages ? messages[0] : null);
+					});
 				});
 			});
 		});
@@ -77,9 +83,11 @@ var db = require('./database'),
 				}
 
 				async.map(messages, function(message, next) {
-					var self = parseInt(message.fromuid, 10) === parseInt(fromuid)
+					var self = parseInt(message.fromuid, 10) === parseInt(fromuid, 10);
 					message.fromUser = self ? userData[0] : userData[1];
 					message.toUser = self ? userData[1] : userData[0];
+					message.timestampISO = new Date(parseInt(message.timestamp, 10)).toISOString();
+					message.self = self ? 1 : 0;
 
 					Messaging.parse(message.content, message.fromuid, fromuid, userData[1], userData[0], isNew, function(result) {
 						message.content = result;
@@ -149,4 +157,21 @@ var db = require('./database'),
 		});
 	};
 
+	// todo #1798 -- this utility method creates a room name given an array of uids.
+	Messaging.uidsToRoom = function(uids, callback) {
+		uid = parseInt(uid, 10);
+		if (typeof uid === 'number' && Array.isArray(roomUids)) {
+			var room = 'chat_';
+
+			room = room + roomUids.map(function(uid) {
+				return parseInt(uid, 10);
+			}).sort(function(a, b) {
+				return a-b;
+			}).join('_');
+
+			callback(null, room);
+		} else {
+			callback(new Error('invalid-uid-or-participant-uids'));
+		}
+	};
 }(exports));
