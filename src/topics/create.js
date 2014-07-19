@@ -141,6 +141,8 @@ module.exports = function(Topics) {
 					topicData = topicData[0];
 					topicData.unreplied = 1;
 
+					plugins.fireHook('action:topic.post', topicData);
+
 					next(null, {
 						topicData: topicData,
 						postData: postData
@@ -223,7 +225,6 @@ module.exports = function(Topics) {
 				Topics.markAsRead(tid, uid, next);
 			},
 			function(result, next) {
-				Topics.pushUnreadCount();
 				posts.getUserInfoForPosts([postData.uid], next);
 			},
 			function(userInfo, next) {

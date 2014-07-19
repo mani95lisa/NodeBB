@@ -11,32 +11,31 @@
   "dependencies": {
     "async": "~0.2.8",
     "bcryptjs": "~0.7.10",
+    "body-parser": "^1.0.1",
+    "compression": "^1.0.1",
     "connect-flash": "^0.1.1",
+    "connect-multiparty": "^1.0.1",
     "connect-redis": "^2.0.0",
+    "cookie-parser": "^1.0.1",
     "cron": "~1.0.4",
+    "csurf": "^1.1.0",
     "daemon": "~1.1.0",
     "express": "4.4.5",
-    "cookie-parser": "^1.0.1",
-    "body-parser": "^1.0.1",
-    "serve-favicon": "^2.0.1",
     "express-session": "^1.0.2",
-    "csurf": "^1.1.0",
-    "compression": "^1.0.1",
-    "connect-multiparty": "^1.0.1",
-    "morgan": "^1.0.0",
     "gm": "1.14.2",
     "gravatar": "1.0.6",
     "less": "~1.6.3",
-    "marked": "0.2.8",
     "mkdirp": "~0.3.5",
+    "morgan": "^1.0.0",
     "nconf": "~0.6.7",
     "nodebb-plugin-cards": "^0.1.0",
     "nodebb-plugin-dbsearch": "0.0.9",
     "nodebb-plugin-dwnvtr": "0.1.0-1",
-    "nodebb-plugin-markdown": "~0.4.1",
-    "nodebb-plugin-swift": "git+https://github.com/mani95lisa/nodebb-plugin-swift.git",
+    "nodebb-plugin-markdown": "~0.4.2",
     "nodebb-plugin-mentions": "~0.5.0",
+    "nodebb-plugin-qiniu-all": "0.0.1",
     "nodebb-plugin-soundpack-default": "~0.1.1",
+    "nodebb-plugin-swift": "git+https://github.com/mani95lisa/nodebb-plugin-swift.git",
     "nodebb-theme-lavender": "git+https://github.com/mani95lisa/nodebb-theme-lavender.git",
     "nodebb-theme-vanilla": "~0.0.21",
     "nodebb-widget-essentials": "~0.0.21",
@@ -49,16 +48,17 @@
     "rimraf": "~2.2.6",
     "rss": "~0.2.0",
     "semver": "~2.2.1",
+    "serve-favicon": "^2.0.1",
     "sitemap": "~0.7.3",
     "socket.io": "~0.9.16",
     "socket.io-wildcard": "~0.1.1",
     "string": "~1.7.0",
+    "templates.js": "0.0.8",
     "uglify-js": "git+https://github.com/julianlam/UglifyJS2.git",
     "underscore": "~1.6.0",
     "validator": "~3.4.0",
     "winston": "~0.7.2",
-    "xregexp": "~2.0.0",
-    "templates.js": "0.0.7"
+    "xregexp": "~2.0.0"
   },
   "devDependencies": {
     "mocha": "~1.13.0"
@@ -87,5 +87,3 @@
     }
   ]
 }
-
-

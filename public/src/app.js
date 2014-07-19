@@ -498,7 +498,6 @@ var socket,
 				hash = window.location.hash,
 				$window = $(window);
 
-			ajaxify.widgets.render(tpl_url, url);
 
 			$window.trigger('action:ajaxify.start', {
 				url: url
@@ -524,7 +523,10 @@ var socket,
 			createHeaderTooltips();
 			ajaxify.variables.parse();
 			ajaxify.currentPage = url;
-			app.processPage();
+
+			$window.trigger('action:ajaxify.contentLoaded', {
+				url: url
+			});
 
 			if (window.history && window.history.replaceState) {
 				window.history.replaceState({
@@ -533,8 +535,11 @@ var socket,
 			}
 
 			ajaxify.loadScript(tpl_url, function() {
-				$window.trigger('action:ajaxify.end', {
-					url: url
+				ajaxify.widgets.render(tpl_url, url, function() {
+					app.processPage();
+					$window.trigger('action:ajaxify.end', {
+						url: url
+					});
 				});
 			});
 		});

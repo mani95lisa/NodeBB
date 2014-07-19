@@ -30,14 +30,14 @@ var async = require('async'),
 		var uid = data.uid,
 			tid = data.tid,
 			content = data.content,
-			toPid = data.toPid;
+			timestamp = data.timestamp || Date.now();
+
 
 		if (uid === null) {
 			return callback(new Error('[[error:invalid-uid]]'));
 		}
 
-		var timestamp = Date.now(),
-			postData;
+		var postData;
 
 		async.waterfall([
 			function(next) {
@@ -58,8 +58,8 @@ var async = require('async'),
 					'deleted': 0
 				};
 
-				if (toPid) {
-					postData.toPid = toPid;
+				if (data.toPid) {
+					postData.toPid = data.toPid;
 				}
 
 				plugins.fireHook('filter:post.save', postData, next);

@@ -54,9 +54,15 @@ module.exports = function(Meta) {
 					return;
 				}
 
-				var css = tree.toCSS({
-					cleancss: true
-				});
+				try {
+					var css = tree.toCSS({
+						cleancss: true
+					});	
+				} catch (err) {
+					winston.error('[meta/css] Syntax Error: ' + err.message + ' - ' + path.basename(err.filename) + ' on line ' + err.line);
+					return;	
+				}
+				
 
 				Meta.css.cache = css;
 

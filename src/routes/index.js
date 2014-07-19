@@ -71,8 +71,8 @@ function tagRoutes(app, middleware, controllers) {
 }
 
 function categoryRoutes(app, middleware, controllers) {
-	app.get('/popular/:set?', middleware.buildHeader, controllers.categories.popular);
-	app.get('/api/popular/:set?', controllers.categories.popular);
+	app.get('/popular/:term?', middleware.buildHeader, controllers.categories.popular);
+	app.get('/api/popular/:term?', controllers.categories.popular);
 
 	app.get('/recent/:term?', middleware.buildHeader, controllers.categories.recent);
 	app.get('/api/recent/:term?', controllers.categories.recent);
@@ -156,18 +156,21 @@ function groupRoutes(app, middleware, controllers) {
 
 
 module.exports = function(app, middleware) {
-
-	var router = express.Router();
-	app.use(nconf.get('relative_path'), router);
-
 	plugins.ready(function() {
+		var router = express.Router(),
+			relativePath = nconf.get('relative_path');
 
-		router.all('/api/*', middleware.updateLastOnlineTime, middleware.prepareAPI);
-		router.all('/api/admin/*', middleware.admin.isAdmin, middleware.prepareAPI);
-		router.all('/admin/*', middleware.admin.isAdmin);
-		router.get('/admin', middleware.admin.isAdmin);
+		router.render = function() {
+			app.render.call(arguments);
+		};
 
-		plugins.fireHook('action:app.load', app, middleware, controllers);
+		app.all(relativePath + '/api/*', middleware.updateLastOnlineTime, middleware.prepareAPI);
+		app.all(relativePath + '/api/admin/*', middleware.admin.isAdmin, middleware.prepareAPI);
+		app.all(relativePath + '/admin/*', middleware.admin.isAdmin);
+		app.get(relativePath + '/admin', middleware.admin.isAdmin);
+
+		// Deprecated as of v0.5.0, remove this hook call for NodeBB v0.6.0-1
+		plugins.fireHook('action:app.load', router, middleware, controllers);
 
 		adminRoutes(router, middleware, controllers);
 		metaRoutes(router, middleware, controllers);
@@ -189,12 +192,15 @@ module.exports = function(app, middleware) {
 		userRoutes(router, middleware, controllers);
 		groupRoutes(router, middleware, controllers);
 
+		plugins.fireHook('filter:app.load', router, middleware, controllers, function() {
+			app.use(relativePath, router);
 
-		app.use(nconf.get('relative_path'), express.static(path.join(__dirname, '../../', 'public'), {
-			maxAge: app.enabled('cache') ? 5184000000 : 0
-		}));
-		app.use(catch404);
-		app.use(handleErrors);
+			app.use(relativePath, express.static(path.join(__dirname, '../../', 'public'), {
+				maxAge: app.enabled('cache') ? 5184000000 : 0
+			}));
+			app.use(catch404);
+			app.use(handleErrors);
+		});
 	});
 
 	if (process.env.NODE_ENV === 'development') {
