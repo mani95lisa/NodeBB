@@ -23,42 +23,42 @@ module.exports = function(Topics) {
 			done = false;
 
 		uid = parseInt(uid, 10);
-		if(uid === 0) {
+		if (uid === 0) {
 			return callback(null, unreadTids);
 		}
 
 		async.whilst(function() {
 			return unreadTids.length < 21 && !done;
-		}, function(callback) {
+		}, function(next) {
 			Topics.getLatestTids(start, stop, 'month', function(err, tids) {
 				if (err) {
-					return callback(err);
+					return next(err);
 				}
 
 				if (tids && !tids.length) {
 					done = true;
-					return callback();
+					return next();
 				}
 
 				Topics.hasReadTopics(tids, uid, function(err, read) {
-					if(err) {
-						return callback(err);
+					if (err) {
+						return next(err);
 					}
-					var newtids = tids.filter(function(tid, index, self) {
+
+					var newtids = tids.filter(function(tid, index) {
 						return !read[index];
 					});
 
-					async.filter(newtids, function(tid, next) {
-						privileges.topics.can('read', tid, uid, function(err, canRead) {
-							next(!err && canRead);
-						});
-					}, function(newtids) {
+					privileges.topics.filter('read', newtids, uid, function(err, newtids) {
+						if (err) {
+							return next(err);
+						}
 						unreadTids.push.apply(unreadTids, newtids);
 
 						start = stop + 1;
 						stop = start + 19;
 
-						callback();
+						next();
 					});
 				});
 			});
@@ -181,8 +181,8 @@ module.exports = function(Topics) {
 	};
 
 	Topics.markTopicNotificationsRead = function(tid, uid) {
-		user.notifications.getUnreadByUniqueId(uid, 'topic:' + tid, function(err, nids) {
-			notifications.mark_read_multiple(nids, uid, function() {
+		user.notifications.getUnreadByField(uid, 'tid', tid, function(err, nids) {
+			notifications.markReadMultiple(nids, uid, function() {
 				user.notifications.pushCount(uid);
 			});
 		});

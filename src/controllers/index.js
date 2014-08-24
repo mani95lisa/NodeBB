@@ -70,7 +70,7 @@ Controllers.home = function(req, res, next) {
 				}
 
 				function getRecentReplies(category, callback) {
-					categories.getRecentReplies(category.cid, uid, parseInt(category.numRecentReplies, 10), function (err, posts) {
+					categories.getRecentTopicReplies(category.cid, uid, parseInt(category.numRecentReplies, 10), function (err, posts) {
 						if (err) {
 							return callback(err);
 						}
@@ -168,6 +168,7 @@ Controllers.register = function(req, res, next) {
 	data.maximumUsernameLength = meta.config.maximumUsernameLength;
 	data.minimumPasswordLength = meta.config.minimumPasswordLength;
 	data.termsOfUse = meta.config.termsOfUse;
+	data.regFormEntry = [];
 
 	plugins.fireHook('filter:register.build', req, res, data, function(err, req, res, data) {
 		if (err && process.env === 'development') {
@@ -187,7 +188,7 @@ Controllers.confirmEmail = function(req, res, next) {
 
 Controllers.sitemap = function(req, res, next) {
 	if (meta.config['feeds:disableSitemap'] === '1') {
-		return res.redirect('404');
+		return res.redirect(nconf.get('relative_path') + '/404')
 	}
 
 	var sitemap = require('../sitemap.js');

@@ -8,7 +8,6 @@
 
 	module.exports = translator;
 
-	// Use this in plugins to add your own translation files.
 	translator.addTranslation = function(language, filename, translations) {
 		languages[language] = languages[language] || {};
 		languages[language].loaded = languages[language].loaded || {};
@@ -141,8 +140,13 @@
 		}
 	};
 
-	translator.load = function (language, filename, callback) {
+	translator.compile = function() {
+		var args = Array.prototype.slice.call(arguments, 0);
 
+		return '[[' + args.join(', ') + ']]';
+	};
+
+	translator.load = function (language, filename, callback) {
 		if (isLanguageFileLoaded(language, filename)) {
 			if (callback) {
 				callback(languages[language].loaded[filename]);

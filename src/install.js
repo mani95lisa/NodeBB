@@ -176,6 +176,9 @@ function setupConfig(next) {
 }
 
 function completeConfigSetup(err, config, next) {
+	if (err) {
+		return next(err);
+	}
 	// Add CI object
 	if (install.ciVals) {
 		config.test_database = {};
@@ -206,6 +209,16 @@ function completeConfigSetup(err, config, next) {
 }
 
 function setupDatabase(server_conf, next) {
+	install.installDbDependencies(server_conf, function(err) {
+		if (err) {
+			return next(err);
+		}
+
+		require('./database').init(next);
+	});
+}
+
+install.installDbDependencies = function(server_conf, next) {
 	var	npm = require('npm'),
 		packages = [];
 
@@ -221,15 +234,9 @@ function setupDatabase(server_conf, next) {
 			packages = packages.concat(DATABASES[server_conf.secondary_database].dependencies);
 		}
 
-		npm.commands.install(packages, function(err) {
-			if (err) {
-				return next(err);
-			}
-
-			require('./database').init(next);
-		});
+		npm.commands.install(packages, next);
 	});
-}
+};
 
 function setupDefaultConfigs(next) {
 	winston.info('Populating database with default configs, if not already set...');
@@ -259,12 +266,19 @@ function setOnEmpty(key1, key2) {
 
 function enableDefaultTheme(next) {
 	var	meta = require('./meta');
-	winston.info('Enabling default theme: Lavender');
 
-	meta.themes.set({
-		type: 'local',
-		id: 'nodebb-theme-lavender'
-	}, next);
+	meta.configs.get('theme:id', function(err, id) {
+		if (err || id) {
+			winston.info('Previous theme detected, skipping enabling default theme');
+			return next(err);
+		}
+
+		winston.info('Enabling default theme: Lavender');
+		meta.themes.set({
+			type: 'local',
+			id: 'nodebb-theme-lavender'
+		}, next);
+	});
 }
 
 function createAdministrator(next) {

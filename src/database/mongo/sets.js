@@ -57,7 +57,7 @@ module.exports = function(db, module) {
 			}
 
 			values = values.map(function(value) {
-				return items.members.indexOf(value) !== -1;
+				return items && Array.isArray(items.members) && items.members.indexOf(value) !== -1;
 			});
 
 			callback(null, values);
@@ -88,6 +88,24 @@ module.exports = function(db, module) {
 	module.getSetMembers = function(key, callback) {
 		db.collection('objects').findOne({_key:key}, {members:1}, function(err, data) {
 			callback(err, data ? data.members : []);
+		});
+	};
+
+	module.getSetsMembers = function(keys, callback) {
+		db.collection('objects').find({_key: {$in: keys}}, {_key: 1, members: 1}).toArray(function(err, data) {
+			if (err) {
+				return callback(err);
+			}
+			var sets = {};
+			data.forEach(function(set) {
+				sets[set._key] = set.members || [];
+			});
+
+			var returnData = new Array(keys.length);
+			for(var i=0; i<keys.length; ++i) {
+				returnData[i] = sets[keys[i]] || [];
+			}
+			callback(null, returnData);
 		});
 	};
 

@@ -134,21 +134,30 @@ module.exports = function(Topics) {
 	};
 
 	Topics.getLatestUndeletedPid = function(tid, callback) {
-		db.getSortedSetRevRange('tid:' + tid + ':posts', 0, -1, function(err, pids) {
+		async.parallel({
+			mainPid: function(next) {
+				Topics.getTopicField(tid, 'mainPid', next);
+			},
+			pids: function(next) {
+				db.getSortedSetRevRange('tid:' + tid + ':posts', 0, -1, next);
+			}
+		}, function(err, results) {
 			if(err) {
 				return callback(err);
 			}
 
-			if (!pids || !pids.length) {
+			if (!results.mainPid && (!Array.isArray(results.pids) || !results.pids.length)) {
 				return callback(null, null);
 			}
 
-			async.detectSeries(pids, function(pid, next) {
+			results.pids.push(results.mainPid);
+
+			async.detectSeries(results.pids, function(pid, next) {
 				posts.getPostField(pid, 'deleted', function(err, deleted) {
 					next(parseInt(deleted, 10) === 0);
 				});
 			}, function(pid) {
-				callback(null, pid ? pid : null);
+				callback(null, pid ? pid.toString() : null);
 			});
 		});
 	};
@@ -182,7 +191,22 @@ module.exports = function(Topics) {
 	};
 
 	Topics.getPids = function(tid, callback) {
-		db.getSortedSetRange('tid:' + tid + ':posts', 0, -1, callback);
+		async.parallel({
+			mainPid: function(next) {
+				Topics.getTopicField(tid, 'mainPid', next);
+			},
+			pids: function(next) {
+				db.getSortedSetRange('tid:' + tid + ':posts', 0, -1, next);
+			}
+		}, function(err, results) {
+			if (err) {
+				return callback(err);
+			}
+			if (results.mainPid) {
+				results.pids = [results.mainPid].concat(results.pids);
+			}
+			callback(null, results.pids);
+		});
 	};
 
 	Topics.increasePostCount = function(tid, callback) {

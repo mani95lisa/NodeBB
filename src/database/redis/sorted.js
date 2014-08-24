@@ -2,6 +2,7 @@
 
 module.exports = function(redisClient, module) {
 	module.sortedSetAdd = function(key, score, value, callback) {
+		callback = callback || function() {};
 		redisClient.zadd(key, score, value, callback);
 	};
 
@@ -54,6 +55,14 @@ module.exports = function(redisClient, module) {
 		redisClient.zrank(key, value, callback);
 	};
 
+	module.sortedSetsRanks = function(keys, values, callback) {
+		var multi = redisClient.multi();
+		for(var i=0; i<values.length; ++i) {
+			multi.zrank(keys[i], values[i]);
+		}
+		multi.exec(callback);
+	};
+
 	module.sortedSetRevRank = function(key, value, callback) {
 		redisClient.zrevrank(key, value, callback);
 	};
@@ -65,6 +74,22 @@ module.exports = function(redisClient, module) {
 	module.isSortedSetMember = function(key, value, callback) {
 		module.sortedSetScore(key, value, function(err, score) {
 			callback(err, !!score);
+		});
+	};
+
+	module.isSortedSetMembers = function(key, values, callback) {
+		var multi = redisClient.multi();
+		for (var i=0; i<values.length; ++i) {
+			multi.zscore(key, values[i]);
+		}
+		multi.exec(function(err, results) {
+			if (err) {
+				return callback(err);
+			}
+			results = results.map(function(score) {
+				return !!score;
+			});
+			callback(null, results);
 		});
 	};
 
@@ -91,16 +116,6 @@ module.exports = function(redisClient, module) {
 	};
 
 	function sortedSetUnion(sets, reverse, start, stop, callback) {
-		// start and stop optional
-		if (typeof start === 'function') {
-			callback = start;
-			start = 0;
-			stop = -1;
-		} else if (typeof stop === 'function') {
-			callback = stop;
-			stop = -1;
-		}
-
 		var	multi = redisClient.multi();
 
 		// zunionstore prep
@@ -111,11 +126,7 @@ module.exports = function(redisClient, module) {
 		multi[reverse ? 'zrevrange' : 'zrange']('temp', start, stop);
 		multi.del('temp');
 		multi.exec(function(err, results) {
-			if (!err && typeof callback === 'function') {
-				callback(null, results[1]);
-			} else if (err) {
-				callback(err);
-			}
+			callback(err, results ? results[1] : null);
 		});
 	}
 };

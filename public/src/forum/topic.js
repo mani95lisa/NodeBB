@@ -26,6 +26,7 @@ define('forum/topic', dependencies, function(pagination, infinitescroll, threadT
 			events.removeListeners();
 
 			socket.removeListener('event:new_post', onNewPost);
+			socket.removeListener('event:new_notification', onNewNotification);
 		}
 	});
 
@@ -42,8 +43,7 @@ define('forum/topic', dependencies, function(pagination, infinitescroll, threadT
 
 		app.enterRoom('topic_' + tid);
 
-		browsing.populateOnlineUsers();
-		$('.post-content img').addClass('img-responsive');
+		processPage($('.topic'));
 
 		showBottomPostBar();
 
@@ -66,17 +66,17 @@ define('forum/topic', dependencies, function(pagination, infinitescroll, threadT
 		navigator.init('.posts > .post-row', postCount, Topic.navigatorCallback, Topic.toTop, Topic.toBottom);
 
 		socket.on('event:new_post', onNewPost);
+		socket.on('event:new_notification', onNewNotification);
 
 		$(window).on('scroll', updateTopicTitle);
 
 		$(window).trigger('action:topic.loaded');
 
-		socket.emit('topics.markAsRead', tid);
-		socket.emit('topics.increaseViewCount', tid);
+		socket.emit('topics.enter', tid);
 	};
 
 	Topic.toTop = function() {
-		navigator.scrollTop(1);
+		navigator.scrollTop(0);
 	};
 
 	Topic.toBottom = function() {
@@ -146,9 +146,15 @@ define('forum/topic', dependencies, function(pagination, infinitescroll, threadT
 			var postcount = $('.user_postcount_' + data.posts[i].uid);
 			postcount.html(parseInt(postcount.html(), 10) + 1);
 		}
-
 		socket.emit('topics.markAsRead', tid);
 		createNewPosts(data);
+	}
+
+	function onNewNotification(data) {
+		var tid = ajaxify.variables.get('topic_id');
+		if (data && data.tid && parseInt(data.tid, 10) === parseInt(tid, 10)) {
+			socket.emit('topics.markTopicNotificationsRead', tid);
+		}
 	}
 
 	function addBlockQuoteHandler() {
@@ -334,13 +340,22 @@ define('forum/topic', dependencies, function(pagination, infinitescroll, threadT
 			getPostPrivileges(posts[x].pid);
 		}
 
+		processPage(html);
+	}
+
+	function processPage(element) {
 		browsing.populateOnlineUsers();
 		app.createUserTooltips();
-		app.replaceSelfLinks(html.find('a'));
-		utils.addCommasToNumbers(html.find('.formatted-number'));
-		utils.makeNumbersHumanReadable(html.find('.human-readable-number'));
-		html.find('span.timeago').timeago();
-		html.find('.post-content img').addClass('img-responsive');
+		app.replaceSelfLinks(element.find('a'));
+		utils.addCommasToNumbers(element.find('.formatted-number'));
+		utils.makeNumbersHumanReadable(element.find('.human-readable-number'));
+		element.find('span.timeago').timeago();
+		element.find('.post-content img:not(.emoji)').addClass('img-responsive').each(function() {
+			var $this = $(this);
+			if (!$this.parent().is('a')) {
+				$this.wrap('<a href="' + $this.attr('src') + '" target="_blank">');
+			}
+		});
 		postTools.updatePostCount();
 		showBottomPostBar();
 	}
@@ -350,7 +365,7 @@ define('forum/topic', dependencies, function(pagination, infinitescroll, threadT
 		postHtml.find('.move').toggleClass('none', !privileges.move);
 		postHtml.find('.reply, .quote').toggleClass('none', !$('.post_reply').length);
 		var isSelfPost = parseInt(postHtml.attr('data-uid'), 10) === parseInt(app.uid, 10);
-		postHtml.find('.chat, .flag').toggleClass('none', isSelfPost);
+		postHtml.find('.chat, .flag').toggleClass('none', isSelfPost || !app.uid);
 	}
 
 	function loadMorePosts(direction) {

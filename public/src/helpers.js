@@ -6,7 +6,7 @@
 	var helpers = {};
 
 	helpers.displayUsersLink = function(config) {
-		return (config.isLoggedIn || !config.privateUserInfo);
+		return (config.loggedIn || !config.privateUserInfo);
 	};
 
 	helpers.buildMetaTag = function(tag) {
@@ -14,7 +14,7 @@
 			property = tag.property ? 'property="' + tag.property + '" ' : '',
 			content = tag.content ? 'content="' + tag.content.replace(/\n/g, ' ') + '" ' : '';
 
-		return '<meta ' + name + property + content + ' />';
+		return '<meta ' + name + property + content + '/>';
 	};
 
 	if ('undefined' !== typeof window) {

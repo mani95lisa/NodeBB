@@ -93,16 +93,6 @@ module.exports = function(Topics) {
 
 		async.waterfall([
 			function(next) {
-				plugins.fireHook('filter:topic.post', data, function(err, filteredData) {
-					if (err) {
-						return next(err);
-					}
-
-					content = filteredData.content || data.content;
-					next();
-				});
-			},
-			function(next) {
 				categories.exists(cid, next);
 			},
 			function(categoryExists, next) {
@@ -119,6 +109,13 @@ module.exports = function(Topics) {
 			},
 			function(next) {
 				user.isReadyToPost(uid, next);
+			},
+			function(next) {
+				plugins.fireHook('filter:topic.post', data, next);
+			},
+			function(filteredData, next) {
+				content = filteredData.content || data.content;
+				next();
 			},
 			function(next) {
 				Topics.create({uid: uid, title: title, cid: cid, thumb: data.thumb, tags: data.tags}, next);
@@ -161,16 +158,6 @@ module.exports = function(Topics) {
 
 		async.waterfall([
 			function(next) {
-				plugins.fireHook('filter:topic.reply', data, function(err, filteredData) {
-					if (err) {
-						return next(err);
-					}
-
-					content = filteredData.content || data.content;
-					next();
-				});
-			},
-			function(next) {
 				threadTools.exists(tid, next);
 			},
 			function(topicExists, next) {
@@ -197,11 +184,15 @@ module.exports = function(Topics) {
 				user.isReadyToPost(uid, next);
 			},
 			function(next) {
+				plugins.fireHook('filter:topic.reply', data, next);
+			},
+			function(filteredData, next) {
+				content = filteredData.content || data.content;
 				if (content) {
 					content = content.trim();
 				}
 
-				if (!content || content.length < meta.config.miminumPostLength) {
+				if (!content || content.length < parseInt(meta.config.miminumPostLength, 10)) {
 					return callback(new Error('[[error:content-too-short, '  + meta.config.minimumPostLength + ']]'));
 				}
 
@@ -209,16 +200,6 @@ module.exports = function(Topics) {
 			},
 			function(data, next) {
 				postData = data;
-
-				if (parseInt(uid, 10)) {
-					Topics.notifyFollowers(tid, postData.pid, uid);
-
-					user.notifications.sendPostNotificationToFollowers(uid, tid, postData.pid);
-				}
-
-				next();
-			},
-			function(next) {
 				Topics.markAsUnreadForAll(tid, next);
 			},
 			function(next) {
@@ -234,9 +215,6 @@ module.exports = function(Topics) {
 			function(topicData, next) {
 				topicData.title = validator.escape(topicData.title);
 				postData.topic = topicData;
-				next();
-			},
-			function(next) {
 				posts.getPidIndex(postData.pid, next);
 			},
 			function(index, next) {
@@ -247,6 +225,12 @@ module.exports = function(Topics) {
 				postData.display_move_tools = true;
 				postData.selfPost = false;
 				postData.relativeTime = utils.toISOString(postData.timestamp);
+
+				if (parseInt(uid, 10)) {
+					Topics.notifyFollowers(tid, postData.pid, uid);
+
+					user.notifications.sendPostNotificationToFollowers(uid, tid, postData.pid);
+				}
 
 				next(null, postData);
 			}

@@ -2,6 +2,7 @@
 'use strict';
 
 var async = require('async'),
+	winston = require('winston'),
 	db = require('../database'),
 	meta = require('../meta'),
 	plugins = require('../plugins'),
@@ -46,7 +47,6 @@ module.exports = function(Topics) {
 			return '';
 		}
 		tag = tag.trim().toLowerCase();
-		tag = tag.replace(/&/g, '&amp;');
 		tag = tag.replace(/[,\/#!$%\^\*;:{}=_`<>'"~()?\|]/g, '');
 		tag = tag.substr(0, meta.config.maximumTagLength || 15);
 		var matches = tag.match(/^[.-]*(.+?)[.-]*$/);
@@ -56,10 +56,11 @@ module.exports = function(Topics) {
 		return tag;
 	};
 
-	function updateTagCount(tag) {
+	function updateTagCount(tag, callback) {
+		callback = callback || function() {};
 		Topics.getTagTopicCount(tag, function(err, count) {
 			if (!err) {
-				db.sortedSetAdd('tags:topic:count', count, tag);
+				db.sortedSetAdd('tags:topic:count', count, tag, callback);
 			}
 		});
 	}
@@ -85,10 +86,28 @@ module.exports = function(Topics) {
 		db.getSetMembers('topic:' + tid + ':tags', callback);
 	};
 
-	//returns tags as objects cuz templates.js cant do arrays yet >_>
 	Topics.getTopicTagsObjects = function(tid, callback) {
 		Topics.getTopicTags(tid, function(err, tags) {
 			callback(err, mapToObject(tags));
+		});
+	};
+
+	Topics.getTopicsTagsObjects = function(tids, callback) {
+		var sets = tids.map(function(tid) {
+			return 'topic:' + tid + ':tags';
+		});
+
+		db.getSetsMembers(sets, function(err, members) {
+			if (err) {
+				return callback(err);
+			}
+
+			members.forEach(function(tags, index) {
+				if (Array.isArray(tags)) {
+					members[index] = mapToObject(tags);
+				}
+			})
+			callback(null, members);
 		});
 	};
 
@@ -103,13 +122,15 @@ module.exports = function(Topics) {
 
 	Topics.updateTags = function(tid, tags) {
 		Topics.getTopicField(tid, 'timestamp', function(err, timestamp) {
-			if (!err) {
-				Topics.deleteTopicTags(tid, function(err) {
-					if (!err) {
-						Topics.createTags(tags, tid, timestamp);
-					}
-				});
+			if (err) {
+				return winston.error(err.message);
 			}
+
+			Topics.deleteTopicTags(tid, function(err) {
+				if (!err) {
+					Topics.createTags(tags, tid, timestamp);
+				}
+			});
 		});
 	};
 
@@ -119,7 +140,7 @@ module.exports = function(Topics) {
 				return callback(err);
 			}
 
-			async.parallel([
+			async.series([
 				function(next) {
 					db.delete('topic:' + tid + ':tags', next);
 				},
@@ -129,6 +150,11 @@ module.exports = function(Topics) {
 					});
 
 					db.sortedSetsRemove(sets, tid, next);
+				},
+				function(next) {
+					async.each(tags, function(tag, next) {
+						updateTagCount(tag, next);
+					}, next);
 				}
 			], callback);
 		});

@@ -18,14 +18,11 @@ module.exports = function(User) {
 			},
 			function(next) {
 				deleteTopics(uid, next);
+			},
+			function(next) {
+				deleteAccount(uid, next);
 			}
-		], function(err) {
-			if (err) {
-				return callback(err);
-			}
-
-			deleteAccount(uid, callback);
-		});
+		], callback);
 	};
 
 	function deletePosts(uid, callback) {
@@ -69,6 +66,9 @@ module.exports = function(User) {
 					db.delete('uid:' + uid + ':notifications:unread', next);
 				},
 				function(next) {
+					db.delete('uid:' + uid + ':notifications:uniqueId:nid', next);
+				},
+				function(next) {
 					db.sortedSetRemove('users:joindate', uid, next);
 				},
 				function(next) {
@@ -91,6 +91,9 @@ module.exports = function(User) {
 				},
 				function(next) {
 					db.delete('uid:' + uid + ':chats', next);
+				},
+				function(next) {
+					db.delete('uid:' + uid + ':chats:unread', next);
 				},
 				function(next) {
 					db.delete('uid:' + uid + ':ip', next);

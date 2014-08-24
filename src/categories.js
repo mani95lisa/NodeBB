@@ -93,7 +93,7 @@ var db = require('./database'),
 				category.pageCount = results.pageCount;
 				category.topic_row_size = 'col-md-9';
 
-				callback(null, category);
+				plugins.fireHook('filter:category.get', category, uid, callback);
 			});
 		});
 	};
@@ -198,19 +198,21 @@ var db = require('./database'),
 				return callback(null, []);
 			}
 
-			Categories.getCategories(cids, uid, function(err, categories) {
+			privileges.categories.filter('find', cids, uid, function(err, cids) {
 				if (err) {
 					return callback(err);
 				}
-				async.filter(categories, function (category, next) {
-					if (category.disabled) {
-						return next(false);
+
+				Categories.getCategories(cids, uid, function(err, categories) {
+					if (err) {
+						return callback(err);
 					}
-					privileges.categories.can('find', category.cid, uid, function(err, findable) {
-						next(!err && findable);
+
+					categories = categories.filter(function(category) {
+						return !category.disabled;
 					});
-				}, function(visibleCategories) {
-					callback(null, visibleCategories);
+
+					callback(null, categories);
 				});
 			});
 		});
@@ -218,18 +220,15 @@ var db = require('./database'),
 
 	Categories.getModerators = function(cid, callback) {
 		Groups.get('cid:' + cid + ':privileges:mods', {}, function(err, groupObj) {
-			if (!err) {
-				if (groupObj.members && groupObj.members.length) {
-					user.getMultipleUserFields(groupObj.members, ['uid', 'username', 'userslug', 'picture'], function(err, moderators) {
-						callback(err, moderators);
-					});
-				} else {
-					callback(null, []);
-				}
-			} else {
-				// Probably no mods
-				callback(null, []);
+			if (err) {
+				return callback(err);
 			}
+
+			if (!Array.isArray(groupObj) || !groupObj.members.length) {
+				return callback(null, []);
+			}
+
+			user.getMultipleUserFields(groupObj.members, ['uid', 'username', 'userslug', 'picture'], callback);
 		});
 	};
 
@@ -238,10 +237,9 @@ var db = require('./database'),
 	};
 
 	Categories.markAsUnreadForAll = function(cid, callback) {
+		callback = callback || function() {};
 		db.delete('cid:' + cid + ':read_by_uid', function(err) {
-			if(typeof callback === 'function') {
-				callback(err);
-			}
+			callback(err);
 		});
 	};
 
@@ -296,6 +294,13 @@ var db = require('./database'),
 		db.getObjectField('category:' + cid, field, callback);
 	};
 
+	Categories.getMultipleCategoryFields = function(cids, fields, callback) {
+		var keys = cids.map(function(cid) {
+			return 'category:' + cid;
+		});
+		db.getObjectsFields(keys, fields, callback);
+	};
+
 	Categories.getCategoryFields = function(cid, fields, callback) {
 		db.getObjectFields('category:' + cid, fields, callback);
 	};
@@ -309,9 +314,12 @@ var db = require('./database'),
 	};
 
 	Categories.getCategories = function(cids, uid, callback) {
-
-		if (!Array.isArray(cids) || cids.length === 0) {
+		if (!Array.isArray(cids)) {
 			return callback(new Error('[[error:invalid-cid]]'));
+		}
+
+		if (!cids.length) {
+			 return callback(null, []);
 		}
 
 		async.parallel({

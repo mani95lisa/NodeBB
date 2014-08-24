@@ -90,19 +90,19 @@ function favouriteCommand(command, eventName, socket, data, callback) {
 	}
 }
 
-function sendNotificationToPostOwner(data, uid, notification) {
-	if(data && data.pid && uid) {
+function sendNotificationToPostOwner(data, fromuid, notification) {
+	if(data && data.pid && fromuid) {
 		posts.getPostFields(data.pid, ['tid', 'uid'], function(err, postData) {
 			if (err) {
 				return;
 			}
 
-			if (uid === parseInt(postData.uid, 10)) {
+			if (fromuid === parseInt(postData.uid, 10)) {
 				return;
 			}
 
 			async.parallel({
-				username: async.apply(user.getUserField, uid, 'username'),
+				username: async.apply(user.getUserField, fromuid, 'username'),
 				slug: async.apply(topics.getTopicField, postData.tid, 'slug'),
 				index: async.apply(posts.getPidIndex, data.pid),
 				postContent: function(next) {
@@ -122,10 +122,12 @@ function sendNotificationToPostOwner(data, uid, notification) {
 					bodyShort: '[[' + notification + ', ' + results.username + ']]',
 					bodyLong: results.postContent,
 					path: nconf.get('relative_path') + '/topic/' + results.slug + '/' + results.index,
-					uniqueId: 'post:' + data.pid,
-					from: uid
-				}, function(nid) {
-					notifications.push(nid, [postData.uid]);
+					uniqueId: 'post:' + data.pid + ':uid:' + fromuid,
+					from: fromuid
+				}, function(err, nid) {
+					if (!err) {
+						notifications.push(nid, [postData.uid]);
+					}
 				});
 			});
 		});
@@ -142,18 +144,14 @@ SocketPosts.getRawPost = function(socket, pid, callback) {
 				return next(new Error('[[error:no-privileges]]'));
 			}
 			posts.getPostFields(pid, ['content', 'deleted'], next);
+		},
+		function(postData, next) {
+			if (parseInt(postData.deleted, 10) === 1) {
+				return next(new Error('[[error:no-post]]'));
+			}
+			next(null, postData.content);
 		}
-	], function(err, post) {
-		if(err) {
-			return callback(err);
-		}
-
-		if(parseInt(post.deleted, 10) === 1) {
-			return callback(new Error('[[error:no-post]]'));
-		}
-
-		callback(null, post.content);
-	});
+	], callback);
 };
 
 SocketPosts.edit = function(socket, data, callback) {
@@ -163,6 +161,8 @@ SocketPosts.edit = function(socket, data, callback) {
 		return callback(new Error('[[error:invalid-data]]'));
 	} else if (!data.title || data.title.length < parseInt(meta.config.minimumTitleLength, 10)) {
 		return callback(new Error('[[error:title-too-short, ' + meta.config.minimumTitleLength + ']]'));
+	} else if (data.title.length > parseInt(meta.config.maximumTitleLength, 10)) {
+		return callback(new Error('[[error:title-too-long, ' + meta.config.maximumTitleLength + ']]'));
 	} else if (!data.content || data.content.length < parseInt(meta.config.minimumPostLength, 10)) {
 		return callback(new Error('[[error:content-too-short, ' + meta.config.minimumPostLength + ']]'));
 	}
@@ -243,37 +243,18 @@ SocketPosts.getPrivileges = function(socket, pid, callback) {
 };
 
 SocketPosts.getFavouritedUsers = function(socket, pid, callback) {
-
 	favourites.getFavouritedUidsByPids([pid], function(err, data) {
-
 		if(err) {
 			return callback(err);
 		}
 
 		if(!Array.isArray(data) || !data.length) {
-			callback(null, "");
+			callback(null, []);
 		}
-
-		var max = 5; //hardcoded
-		var finalText = "";
 
 		var pid_uids = data[0];
-		var rest_amount = 0;
 
-		if (pid_uids.length > max) {
-			rest_amount = pid_uids.length - max;
-			pid_uids = pid_uids.slice(0, max);
-		}
-
-		user.getUsernamesByUids(pid_uids, function(err, usernames) {
-			if(err) {
-				return callback(err);
-			}
-
-			finalText = usernames.join(', ') + (rest_amount > 0 ?
-				(" and " + rest_amount + (rest_amount > 1 ? " others" : " other")) : "");
-			callback(null, finalText);
-		});
+		user.getUsernamesByUids(pid_uids, callback);
 	});
 };
 
@@ -327,10 +308,11 @@ SocketPosts.flag = function(socket, pid, callback) {
 				path: path,
 				uniqueId: 'post_flag:' + pid,
 				from: socket.uid
-			}, function(nid) {
-				notifications.push(nid, adminGroup.members, function() {
-					next();
-				});
+			}, function(err, nid) {
+				if (err) {
+					return next(err);
+				}
+				notifications.push(nid, adminGroup.members, next);
 			});
 		},
 		function(next) {

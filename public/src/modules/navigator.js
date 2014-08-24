@@ -4,7 +4,7 @@
 /* globals app, define, ajaxify, utils, translator, config */
 
 
-define('navigator', ['forum/topic/pagination'], function(pagination) {
+define('navigator', ['forum/pagination'], function(pagination) {
 
 	var navigator = {};
 	var index = 1;
@@ -110,7 +110,7 @@ define('navigator', ['forum/topic/pagination'], function(pagination) {
 
 	navigator.scrollTop = function(index) {
 		if ($('li[data-index="' + index + '"]').length) {
-			navigator.scrollUp();
+			navigator.scrollToPost(index, true);
 		} else {
 			ajaxify.go(generateUrl());
 		}
@@ -118,7 +118,7 @@ define('navigator', ['forum/topic/pagination'], function(pagination) {
 
 	navigator.scrollBottom = function(index) {
 		if ($('li[data-index="' + index + '"]').length) {
-			navigator.scrollDown();
+			navigator.scrollToPost(index, true);
 		} else {
 			index = parseInt(index, 10) + 1;
 			ajaxify.go(generateUrl(index));
@@ -191,7 +191,7 @@ define('navigator', ['forum/topic/pagination'], function(pagination) {
 				scrollTo.parent().find('.topic-item').addClass('highlight');
 				setTimeout(function() {
 					scrollTo.parent().find('.topic-item').removeClass('highlight');
-				}, 5000);
+				}, 3000);
 			}
 		}
 

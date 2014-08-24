@@ -12,49 +12,70 @@ var async = require('async'),
 
 module.exports = function(User) {
 
-	User.create = function(userData, callback) {
-		var customFields = {};
+	User.create = function(data, callback) {
+		var gravatar = User.createGravatarURLFromEmail(data.email);
+		var timestamp = Date.now();
+		var password = data.password;
 
-		userData = userData || {};
+		var userData = {
+			'username': data.username.trim(),
+			'email': data.email,
+			'joindate': timestamp,
+			'picture': gravatar,
+			'gravatarpicture': gravatar,
+			'fullname': '',
+			'location': '',
+			'birthday': '',
+			'website': '',
+			'signature': '',
+			'uploadedpicture': '',
+			'profileviews': 0,
+			'reputation': 0,
+			'postcount': 0,
+			'lastposttime': 0,
+			'banned': 0,
+			'status': 'online'
+		};
+
 		userData.userslug = utils.slugify(userData.username);
 
-		userData.username = userData.username.trim();
 		if (userData.email !== undefined) {
 			userData.email = userData.email.trim();
 			userData.email = validator.escape(userData.email);
 		}
 
-		var password = userData.password;
-		userData.password = null;
-
-		async.parallel([
-			function(next) {
+		async.parallel({
+			emailValid: function(next) {
 				if (userData.email) {
 					next(!utils.isEmailValid(userData.email) ? new Error('[[error:invalid-email]]') : null);
 				} else {
 					next();
 				}
 			},
-			function(next) {
+			userNameValid: function(next) {
 				next((!utils.isUserNameValid(userData.username) || !userData.userslug) ? new Error('[[error:invalid-username]]') : null);
 			},
-			function(next) {
+			passwordValid: function(next) {
 				if (password) {
 					next(!utils.isPasswordValid(password) ? new Error('[[error:invalid-password]]') : null);
 				} else {
 					next();
 				}
 			},
-			function(next) {
+			renamedUsername: function(next) {
 				meta.userOrGroupExists(userData.userslug, function(err, exists) {
 					if (err) {
 						return next(err);
 					}
 
 					if (exists) {
+						var	newUsername = '';
 						async.forever(function(next) {
-							var	newUsername = userData.username + (Math.floor(Math.random() * 255) + 1);
+							newUsername = userData.username + (Math.floor(Math.random() * 255) + 1);
 							User.exists(newUsername, function(err, exists) {
+								if (err) {
+									return callback(err);
+								}
 								if (!exists) {
 									next(newUsername);
 								} else {
@@ -69,7 +90,7 @@ module.exports = function(User) {
 					}
 				});
 			},
-			function(next) {
+			emailAvailable: function(next) {
 				if (userData.email) {
 					User.email.available(userData.email, function(err, available) {
 						if (err) {
@@ -81,64 +102,42 @@ module.exports = function(User) {
 					next();
 				}
 			},
-			function(next) {
-				plugins.fireHook('filter:user.custom_fields', userData, function(err, fields) {
-					customFields = fields;
-					next(err);
-				});
+			customFields: function(next) {
+				plugins.fireHook('filter:user.custom_fields', [], next);
 			},
-			function(next) {
-				plugins.fireHook('filter:user.create', userData, function(err, filteredUserData){
-					next(err, utils.merge(userData, filteredUserData));
-				});
+			userData: function(next) {
+				plugins.fireHook('filter:user.create', userData, next);
 			}
-		], function(err, results) {
+		}, function(err, results) {
 			if (err) {
 				return callback(err);
 			}
 
-			userData = results[results.length - 1];
-			var userNameChanged = !!results[3];
-			// If a new username was picked...
+			var customData = {};
+			results.customFields.forEach(function(customField) {
+				if (data[customField]) {
+					customData[customField] = data[customField];
+				}
+			});
+
+			userData = utils.merge(results.userData, customData);
+
+			var userNameChanged = !!results.renamedUsername;
+
 			if (userNameChanged) {
-				userData.username = results[3];
-				userData.userslug = utils.slugify(results[3]);
+				userData.username = results.renamedUsername;
+				userData.userslug = utils.slugify(results.renamedUsername);
 			}
 
 			db.incrObjectField('global', 'nextUid', function(err, uid) {
-				if(err) {
+				if (err) {
 					return callback(err);
 				}
 
-				var gravatar = User.createGravatarURLFromEmail(userData.email);
-				var timestamp = Date.now();
-
-				userData = {
-					'uid': uid,
-					'username': userData.username,
-					'userslug': userData.userslug,
-					'fullname': '',
-					'location': '',
-					'birthday': '',
-					'website': '',
-					'email': userData.email || '',
-					'signature': '',
-					'joindate': timestamp,
-					'picture': gravatar,
-					'gravatarpicture': gravatar,
-					'uploadedpicture': '',
-					'profileviews': 0,
-					'reputation': 0,
-					'postcount': 0,
-					'lastposttime': 0,
-					'banned': 0,
-					'status': 'online'
-				};
-
-				userData = utils.merge(userData, customFields);
+				userData.uid = uid;
 
 				db.setObject('user:' + uid, userData, function(err) {
-					if(err) {
+					if (err) {
 						return callback(err);
 					}
 
@@ -167,8 +166,10 @@ module.exports = function(User) {
 							bodyLong: '',
 							image: 'brand:logo',
 							datetime: Date.now()
-						}, function(nid) {
-							notifications.push(nid, uid);
+						}, function(err, nid) {
+							if (!err) {
+								notifications.push(nid, uid);
+							}
 						});
 					}
 

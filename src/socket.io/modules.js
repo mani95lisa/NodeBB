@@ -175,6 +175,20 @@ SocketModules.chats.send = function(socket, data, callback) {
 		return;
 	}
 
+	Messaging.verifySpammer(socket.uid, function(err, isSpammer) {
+		if (!err && isSpammer) {
+			var sockets = server.getUserSockets(socket.uid);
+
+			for(var i = 0; i < sockets.length; ++i) {
+				sockets[i].emit('event:banned');
+			}
+
+			// We're just logging them out, so a "temporary ban" to prevent abuse. Revisit once we implement a way to temporarily ban users
+			server.logoutUser(socket.uid);
+			return callback();
+		}
+	});
+
 	var msg = S(data.message).stripTags().s;
 
 	Messaging.addMessage(socket.uid, touid, msg, function(err, message) {
@@ -189,6 +203,7 @@ SocketModules.chats.send = function(socket, data, callback) {
 		recipMessage.self = 0;
 
 		// Recipient
+		SocketModules.chats.pushUnreadCount(touid);
 		server.getUserSockets(touid).forEach(function(s) {
 			s.emit('event:chats.receive', {
 				withUid: socket.uid,
@@ -197,6 +212,7 @@ SocketModules.chats.send = function(socket, data, callback) {
 		});
 
 		// Sender
+		SocketModules.chats.pushUnreadCount(socket.uid);
 		server.getUserSockets(socket.uid).forEach(function(s) {
 			s.emit('event:chats.receive', {
 				withUid: touid,
@@ -213,13 +229,34 @@ function sendChatNotification(fromuid, touid, messageObj) {
 			bodyShort: '[[notifications:new_message_from, ' + messageObj.fromUser.username + ']]',
 			bodyLong: messageObj.content,
 			path: nconf.get('relative_path') + '/chats/' + utils.slugify(messageObj.fromUser.username),
-			uniqueId: 'notification_' + fromuid + '_' + touid,
+			uniqueId: 'chat_' + fromuid + '_' + touid,
 			from: fromuid
-		}, function(nid) {
-			notifications.push(nid, [touid]);
+		}, function(err, nid) {
+			if (!err) {
+				notifications.push(nid, [touid]);
+			}
 		});
 	}
 }
+
+SocketModules.chats.pushUnreadCount = function(uid) {
+	Messaging.getUnreadCount(uid, function(err, unreadCount) {
+		if (err) {
+			return;
+		}
+		server.getUserSockets(uid).forEach(function(s) {
+			s.emit('event:unread.updateChatCount', null, unreadCount);
+		});
+	});
+};
+
+SocketModules.chats.markRead = function(socket, touid, callback) {
+	Messaging.markRead(socket.uid, touid, function(err) {
+		if (!err) {
+			SocketModules.chats.pushUnreadCount(socket.uid);
+		}
+	});
+};
 
 SocketModules.chats.userStartTyping = function(socket, data, callback) {
 	sendTypingNotification('event:chats.userStartTyping', socket, data, callback);
@@ -243,12 +280,12 @@ SocketModules.chats.list = function(socket, data, callback) {
 };
 
 /* Notifications */
-SocketModules.notifications.mark_read = function(socket, nid) {
-	notifications.mark_read(nid, socket.uid);
+SocketModules.notifications.markRead = function(socket, nid) {
+	notifications.markRead(nid, socket.uid);
 };
 
-SocketModules.notifications.mark_all_read = function(socket, data, callback) {
-	notifications.mark_all_read(socket.uid, callback);
+SocketModules.notifications.markAllRead = function(socket, data, callback) {
+	notifications.markAllRead(socket.uid, callback);
 };
 
 /* Sounds */

@@ -10,7 +10,7 @@ var async = require('async'),
 
 module.exports = function(Categories) {
 	Categories.getRecentReplies = function(cid, uid, count, callback) {
-		if(!parseInt(count, 10)) {
+		if (!parseInt(count, 10)) {
 			return callback(null, []);
 		}
 
@@ -20,6 +20,60 @@ module.exports = function(Categories) {
 			}
 
 			posts.getPostSummaryByPids(pids, {stripTags: true}, callback);
+		});
+	};
+
+	Categories.getRecentTopicReplies = function(cid, uid, count, callback) {
+		count = parseInt(count, 10);
+		if (!count) {
+			return callback(null, []);
+		}
+
+		db.getSortedSetRevRange('categories:recent_posts:cid:' + cid, 0, 0, function(err, pids) {
+			if (err || !pids || !pids.length) {
+				return callback(err, []);
+			}
+
+			if (count === 1) {
+				return posts.getPostSummaryByPids(pids, {stripTags: true}, callback);
+			}
+
+			async.parallel({
+				pinnedTids: function(next) {
+					db.getSortedSetRevRangeByScore('categories:' + cid + ':tid', 0, -1, Infinity, Date.now(), next);
+				},
+				tids: function(next) {
+					db.getSortedSetRevRangeByScore('categories:' + cid + ':tid', 0, Math.max(0, count), Date.now(), 0, next);
+				}
+			}, function(err, results) {
+				if (err) {
+					return callback(err);
+				}
+
+				results.tids = results.tids.concat(results.pinnedTids);
+
+				async.map(results.tids, topics.getLatestUndeletedPid, function(err, topicPids) {
+					if (err) {
+						return callback(err);
+					}
+
+					pids = pids.concat(topicPids).filter(function(pid, index, array) {
+						return !!pid && array.indexOf(pid) === index;
+					});
+
+					posts.getPostSummaryByPids(pids, {stripTags: true}, function(err, posts) {
+						if (err) {
+							return callback(err);
+						}
+
+						posts = posts.sort(function(a, b) {
+							return parseInt(b.timestamp, 10) - parseInt(a.timestamp, 10);
+						}).slice(0, count);
+
+						callback(err, posts);
+					});
+				});
+			});
 		});
 	};
 
@@ -36,23 +90,14 @@ module.exports = function(Categories) {
 		}
 
 		updatePostCount(tid, oldCid, cid);
-		async.parallel({
-			mainPid: function(next) {
-				topics.getTopicField(tid, 'mainPid', next);
-			},
-			pids: function(next) {
-				topics.getPids(tid, next);
-			}
-		}, function(err, results) {
+		topics.getPids(tid, function(err, pids) {
 			if (err) {
 				return winston.error(err.message);
 			}
 
-			if (!results.mainPid && results.pids && !results.pids.length) {
+			if (pids && !pids.length) {
 				return;
 			}
-
-			var pids = [results.mainPid].concat(results.pids);
 
 			var keys = pids.map(function(pid) {
 				return 'post:' + pid;

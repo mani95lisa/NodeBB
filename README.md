@@ -1,5 +1,5 @@
 # <img alt="NodeBB" src="http://i.imgur.com/mYxPPtB.png" />
-[![Build Status](https://travis-ci.org/NodeBB/NodeBB.svg?branch=master)](https://travis-ci.org/nodebb/nodebb)
+[![Build Status](https://travis-ci.org/NodeBB/NodeBB.svg?branch=master)](https://travis-ci.org/NodeBB/NodeBB)
 [![Dependency Status](https://david-dm.org/nodebb/nodebb.svg)](https://david-dm.org/nodebb/nodebb)
 [![Code Climate](https://codeclimate.com/github/designcreateplay/NodeBB.png)](https://codeclimate.com/github/designcreateplay/NodeBB)
 
@@ -36,7 +36,7 @@ Credit: [Convoe](http://www.convoe.com), [Kano](http://www.kano.me), [Manchester
 NodeBB requires the following software to be installed:
 
 * A version of Node.js at least 0.10 or greater
-* Redis, version 2.6 or greater **or** MongoDB, version 2.4 or greater
+* Redis, version 2.6 or greater **or** MongoDB, version 2.6 or greater
 * nginx, version 1.3.13 or greater (**only if** intending to use nginx to proxy requests to a NodeBB)
 
 ## Installation
@@ -56,7 +56,7 @@ It is important to ensure that your NodeBB and database servers are secured. Bea
 
 ## Upgrading NodeBB
 
-Detailed upgrade instructions are listed in [Upgrading NodeBB](https://github.com/NodeBB/NodeBB/wiki/Upgrading-NodeBB)
+Detailed upgrade instructions are listed in [Upgrading NodeBB](https://docs.nodebb.org/en/latest/upgrading/index.html)
 
 ## License
 

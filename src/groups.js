@@ -16,6 +16,9 @@
 				// Remove system, hidden, or deleted groups from this list
 				if (groups && !options.showAllGroups) {
 					return groups.filter(function (group) {
+						if (!group) {
+							return false;
+						}
 						if (group.deleted || (group.hidden && !group.system) || (!options.showSystemGroups && group.system)) {
 							return false;
 						} else if (options.removeEphemeralGroups && ephemeralGroups.indexOf(group.name) !== -1) {
@@ -57,6 +60,9 @@
 
 	Groups.list = function(options, callback) {
 		db.getSetMembers('groups', function (err, groupNames) {
+			if (err) {
+				return callback(err);
+			}
 			groupNames = groupNames.concat(ephemeralGroups);
 
 			async.map(groupNames, function (groupName, next) {
@@ -150,7 +156,14 @@
 		db.isSetMember('group:' + groupName + ':members', uid, callback);
 	};
 
+	Groups.isMembers = function(uids, groupName, callback) {
+		db.isSetMembers('group:' + groupName + ':members', uids, callback);
+	};
+
 	Groups.isMemberOfGroups = function(uid, groups, callback) {
+		groups = groups.map(function(groupName) {
+			return 'group:' + groupName + ':members';
+		});
 		db.isMemberOfSets(groups, uid, callback);
 	};
 
@@ -180,7 +193,11 @@
 	};
 
 	Groups.exists = function(name, callback) {
-		db.isSetMember('groups', name, callback);
+		if (Array.isArray(name)) {
+			db.isSetMembers('groups', name, callback);
+		} else {
+			db.isSetMember('groups', name, callback);
+		}
 	};
 
 	Groups.create = function(name, description, callback) {
@@ -203,6 +220,7 @@
 
 			var groupData = {
 				name: name,
+				userTitle: name,
 				description: description,
 				deleted: '0',
 				hidden: '0',
@@ -240,9 +258,87 @@
 				icon: values.icon || '',
 				labelColor: values.labelColor || '#000000',
 				hidden: values.hidden || '0'
-			}, callback);
+			}, function(err) {
+				if (err) {
+					return callback(err);
+				}
+
+				renameGroup(groupName, values.name, callback);
+			});
 		});
 	};
+
+	function renameGroup(oldName, newName, callback) {
+		if (oldName === newName || !newName || newName.length === 0) {
+			return callback();
+		}
+
+		db.getObject('group:' + oldName, function(err, group) {
+			if (err || !group) {
+				return callback(err);
+			}
+
+			if (parseInt(group.system, 10) === 1 || parseInt(group.hidden, 10) === 1) {
+				return callback();
+			}
+
+			Groups.exists(newName, function(err, exists) {
+				if (err || exists) {
+					return callback(err || new Error('[[error:group-already-exists]]'));
+				}
+
+				async.series([
+					function(next) {
+						db.setObjectField('group:' + oldName, 'name', newName, next);
+					},
+					function(next) {
+						db.getSetMembers('groups', function(err, groups) {
+							if (err) {
+								return next(err);
+							}
+							async.each(groups, function(group, next) {
+								renameGroupMember('group:' + group + ':members', oldName, newName, next);
+							}, next);
+						});
+					},
+					function(next) {
+						db.rename('group:' + oldName, 'group:' + newName, next);
+					},
+					function(next) {
+						Groups.exists('group:' + oldName + ':members', function(err, exists) {
+							if (err) {
+								return next(err);
+							}
+							if (exists) {
+								db.rename('group:' + oldName + ':members', 'group:' + newName + ':members', next);
+							} else {
+								next();
+							}
+						});
+					},
+					function(next) {
+						renameGroupMember('groups', oldName, newName, next);
+					}
+				], callback);
+			});
+		});
+	}
+
+	function renameGroupMember(group, oldName, newName, callback) {
+		db.isSetMember(group, oldName, function(err, isMember) {
+			if (err || !isMember) {
+				return callback(err);
+			}
+			async.series([
+				function (next) {
+					db.setRemove(group, oldName, next);
+				},
+				function (next) {
+					db.setAdd(group, newName, next);
+				}
+			], callback);
+		});
+	}
 
 	Groups.destroy = function(groupName, callback) {
 		async.parallel([
@@ -254,6 +350,16 @@
 			},
 			function(next) {
 				db.delete('group:' + groupName + ':members', next);
+			},
+			function(next) {
+				db.getSetMembers('groups', function(err, groups) {
+					if (err) {
+						return next(err);
+					}
+					async.each(groups, function(group, next) {
+						db.setRemove('group:' + group + ':members', groupName, next);
+					}, next);
+				});
 			}
 		], callback);
 	};
@@ -332,10 +438,14 @@
 		});
 	};
 
-	Groups.getUserGroups = function(uid, callback) {
+	Groups.getUserGroups = function(uids, callback) {
 		var ignoredGroups = ['registered-users'];
 
 		db.getSetMembers('groups', function(err, groupNames) {
+			if (err) {
+				return callback(err);
+			}
+
 			var groupKeys = groupNames.filter(function(groupName) {
 				return ignoredGroups.indexOf(groupName) === -1;
 			}).map(function(groupName) {
@@ -343,26 +453,35 @@
 			});
 
 			db.getObjectsFields(groupKeys, ['name', 'hidden', 'userTitle', 'icon', 'labelColor'], function(err, groupData) {
+				if (err) {
+					return callback(err);
+				}
 
 				groupData = groupData.filter(function(group) {
-					return parseInt(group.hidden, 10) !== 1;
+					return parseInt(group.hidden, 10) !== 1 && !!group.userTitle;
 				});
 
 				var groupSets = groupData.map(function(group) {
-					group.userTitle = group.userTitle || group.name;
 					group.labelColor = group.labelColor || '#000000';
 					return 'group:' + group.name + ':members';
 				});
 
-				db.isMemberOfSets(groupSets, uid, function(err, isMembers) {
-					for(var i=isMembers.length - 1; i>=0; --i) {
-						if (!isMembers[i]) {
-							groupData.splice(i, 1);
+				async.map(uids, function(uid, next) {
+					db.isMemberOfSets(groupSets, uid, function(err, isMembers) {
+						if (err) {
+							return next(err);
 						}
-					}
 
-					callback(null, groupData);
-				});
+						var memberOf = [];
+						isMembers.forEach(function(isMember, index) {
+							if (isMember) {
+								memberOf.push(groupData[index]);
+							}
+						});
+
+						next(null, memberOf);
+					});
+				}, callback);
 			});
 		});
 	};

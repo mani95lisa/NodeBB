@@ -5,11 +5,12 @@ var fs = require('fs'),
 	async = require('async'),
 	winston = require('winston'),
 	nconf = require('nconf'),
-	eventEmitter = require('events').EventEmitter,
 	semver = require('semver'),
 
 	db = require('./database'),
+	emitter = require('./emitter'),
 	meta = require('./meta'),
+	translator = require('../public/src/translator'),
 	utils = require('../public/src/utils'),
 	pkg = require('../package.json');
 
@@ -21,11 +22,9 @@ var fs = require('fs'),
 	Plugins.cssFiles = [];
 	Plugins.lessFiles = [];
 	Plugins.clientScripts = [];
+	Plugins.customLanguages = [];
 
 	Plugins.initialized = false;
-
-	// Events
-	Plugins.readyEvent = new eventEmitter();
 
 	Plugins.init = function() {
 		if (Plugins.initialized) {
@@ -47,14 +46,20 @@ var fs = require('fs'),
 			if (global.env === 'development') {
 				winston.info('[plugins] Plugins OK');
 			}
+
 			Plugins.initialized = true;
-			Plugins.readyEvent.emit('ready');
+			emitter.emit('plugins:loaded');
+		});
+
+		Plugins.registerHook('core', {
+			hook: 'static:app.load',
+			method: addLanguages
 		});
 	};
 
 	Plugins.ready = function(callback) {
 		if (!Plugins.initialized) {
-			Plugins.readyEvent.once('ready', callback);
+			emitter.once('plugins:loaded', callback);
 		} else {
 			callback();
 		}
@@ -179,29 +184,31 @@ var fs = require('fs'),
 						Plugins.staticDirs[pluginData.id] = path.join(pluginPath, pluginData.staticDir);
 					}
 
-					for(var key in pluginData.staticDirs) {
-						(function(mappedPath) {
-							if (pluginData.staticDirs.hasOwnProperty(mappedPath)) {
-								if (Plugins.staticDirs[mappedPath]) {
-									winston.warn('[plugins/' + pluginData.id + '] Mapped path (' + mappedPath + ') already specified!');
-								} else if (!validMappedPath.test(mappedPath)) {
-									winston.warn('[plugins/' + pluginData.id + '] Invalid mapped path specified: ' + mappedPath + '. Path must adhere to: ' + validMappedPath.toString());
-								} else {
-									realPath = pluginData.staticDirs[mappedPath];
-									staticDir = path.join(pluginPath, realPath);
+					function mapStaticDirs(mappedPath) {
+						if (Plugins.staticDirs[mappedPath]) {
+							winston.warn('[plugins/' + pluginData.id + '] Mapped path (' + mappedPath + ') already specified!');
+						} else if (!validMappedPath.test(mappedPath)) {
+							winston.warn('[plugins/' + pluginData.id + '] Invalid mapped path specified: ' + mappedPath + '. Path must adhere to: ' + validMappedPath.toString());
+						} else {
+							realPath = pluginData.staticDirs[mappedPath];
+							staticDir = path.join(pluginPath, realPath);
 
-									(function(staticDir) {
-										fs.exists(staticDir, function(exists) {
-											if (exists) {
-												Plugins.staticDirs[pluginData.id + '/' + mappedPath] = staticDir;
-											} else {
-												winston.warn('[plugins/' + pluginData.id + '] Mapped path \'' + mappedPath + ' => ' + staticDir + '\' not found.');
-											}
-										});
-									}(staticDir));
-								}
-							}
-						}(key));
+							(function(staticDir) {
+								fs.exists(staticDir, function(exists) {
+									if (exists) {
+										Plugins.staticDirs[pluginData.id + '/' + mappedPath] = staticDir;
+									} else {
+										winston.warn('[plugins/' + pluginData.id + '] Mapped path \'' + mappedPath + ' => ' + staticDir + '\' not found.');
+									}
+								});
+							}(staticDir));
+						}
+					}
+
+					for(var key in pluginData.staticDirs) {
+						if (pluginData.staticDirs.hasOwnProperty(key)) {
+							mapStaticDirs(key);
+						}
 					}
 
 					next();
@@ -247,6 +254,40 @@ var fs = require('fs'),
 					}
 
 					next();
+				},
+				function(next) {
+					if (pluginData.languages && typeof pluginData.languages === 'string') {
+						var pathToFolder = path.join(__dirname, '../node_modules/', pluginData.id, pluginData.languages);
+
+						utils.walk(pathToFolder, function(err, languages) {
+							var arr = [];
+
+							async.each(languages, function(pathToLang, next) {
+								fs.readFile(pathToLang, function(err, file) {
+									var json;
+
+									try {
+										json = JSON.parse(file.toString());
+									} catch (err) {
+										winston.error('[plugins] Unable to parse custom language file: ' + pathToLang + '\r\n' + err.stack);
+										return next(err);
+									}
+
+									arr.push({
+										file: json,
+										route: pathToLang.replace(pathToFolder, '')
+									});
+
+									next(err);
+								});
+							}, function(err) {
+								Plugins.customLanguages = Plugins.customLanguages.concat(arr);
+								next(err);
+							});
+						});
+					} else {
+						next();
+					}
 				}
 			], function(err) {
 				if (!err) {
@@ -271,32 +312,40 @@ var fs = require('fs'),
 
 		var method;
 
-		if (data.hook && data.method && typeof data.method === 'string' && data.method.length > 0) {
+		if (data.hook && data.method) {
 			data.id = id;
 			if (!data.priority) {
 				data.priority = 10;
 			}
-			method = data.method.split('.').reduce(function(memo, prop) {
-				if (memo !== null && memo[prop]) {
-					return memo[prop];
-				} else {
-					// Couldn't find method by path, aborting
-					return null;
-				}
-			}, Plugins.libraries[data.id]);
 
-			if (method === null) {
+			if (typeof data.method === 'string' && data.method.length > 0) {
+				method = data.method.split('.').reduce(function(memo, prop) {
+					if (memo !== null && memo[prop]) {
+						return memo[prop];
+					} else {
+						// Couldn't find method by path, aborting
+						return null;
+					}
+				}, Plugins.libraries[data.id]);
+
+				// Write the actual method reference to the hookObj
+				data.method = method;
+
+				register();
+			} else if (typeof data.method === 'function') {
+				register();
+			} else {
 				winston.warn('[plugins/' + id + '] Hook method mismatch: ' + data.hook + ' => ' + data.method);
-				return callback();
 			}
+		}
 
-			// Write the actual method reference to the hookObj
-			data.method = method;
-
+		function register() {
 			Plugins.loadedHooks[data.hook] = Plugins.loadedHooks[data.hook] || [];
 			Plugins.loadedHooks[data.hook].push(data);
 
-			callback();
+			if (typeof callback === 'function') {
+				callback();
+			}
 		}
 	};
 
@@ -314,7 +363,7 @@ var fs = require('fs'),
 
 		var hookList = Plugins.loadedHooks[hook];
 
-		if (hookList && Array.isArray(hookList)) {
+		if (Array.isArray(hookList)) {
 			// if (global.env === 'development') winston.info('[plugins] Firing hook: \'' + hook + '\'');
 			var hookType = hook.split(':')[0];
 			switch (hookType) {
@@ -322,7 +371,10 @@ var fs = require('fs'),
 					async.reduce(hookList, args, function(value, hookObj, next) {
 						if (hookObj.method) {
 							if (!hookObj.hasOwnProperty('callbacked') || hookObj.callbacked === true) {
-								var	value = hookObj.method.apply(Plugins, value.concat(function() {
+								// omg, after 6 months I finally realised what this does...
+								// It adds the callback to the arguments passed-in, since the callback
+								// is defined in *this* file (the async cb), and not the hooks themselves.
+								value = hookObj.method.apply(Plugins, value.concat(function() {
 									next(arguments[0], Array.prototype.slice.call(arguments, 1));
 								}));
 
@@ -353,7 +405,9 @@ var fs = require('fs'),
 							}
 						}
 
-						callback.apply(Plugins, [err].concat(values));
+						if (callback) {
+							callback.apply(Plugins, [err].concat(values));
+						}
 					});
 					break;
 				case 'action':
@@ -361,7 +415,7 @@ var fs = require('fs'),
 					async.each(hookList, function(hookObj, next) {
 						/*
 							Backwards compatibility block for v0.5.0
-							Remove this once NodeBB enters v0.5.0-1
+							Remove this once NodeBB enters v0.6.0-1
 						*/
 						if (hook === 'action:app.load') {
 							deprecationWarn.push(hookObj.id);
@@ -380,15 +434,24 @@ var fs = require('fs'),
 					}, function() {
 						/*
 							Backwards compatibility block for v0.5.0
-							Remove this once NodeBB enters v0.5.0-1
+							Remove this once NodeBB enters v0.6.0-1
 						*/
 						if (deprecationWarn.length) {
-							winston.warn('[plugins] The `action:app.load` hook is deprecated in favour of `filter:app.load`, please notify the developers of the following plugins:');
+							winston.warn('[plugins] The `action:app.load` hook is deprecated in favour of `static:app.load`, please notify the developers of the following plugins:');
 							for(var x=0,numDeprec=deprecationWarn.length;x<numDeprec;x++) {
 								process.stdout.write('  * ' + deprecationWarn[x] + '\n');
 							}
 						}
 						/* End backwards compatibility block */
+					});
+					break;
+				case 'static':
+					async.each(hookList, function(hookObj, next) {
+						if (hookObj.method) {
+							hookObj.method.apply(Plugins, args.concat(next));
+						}
+					}, function(err) {
+						callback(err);
 					});
 					break;
 				default:
@@ -528,6 +591,7 @@ var fs = require('fs'),
 				plugins[i].id = plugins[i].name;
 				plugins[i].installed = false;
 				plugins[i].active = false;
+				plugins[i].url = plugins[i].repository ? plugins[i].repository.url : '';
 				pluginMap[plugins[i].name] = plugins[i];
 			}
 
@@ -542,7 +606,7 @@ var fs = require('fs'),
 					pluginMap[plugin.id].id = pluginMap[plugin.id].id || plugin.id;
 					pluginMap[plugin.id].name = pluginMap[plugin.id].name || plugin.id;
 					pluginMap[plugin.id].description = plugin.description;
-					pluginMap[plugin.id].url = plugin.url;
+					pluginMap[plugin.id].url = pluginMap[plugin.id].url || plugin.url;
 					pluginMap[plugin.id].installed = true;
 
 					Plugins.isActive(plugin.id, function(err, active) {
@@ -626,8 +690,10 @@ var fs = require('fs'),
 							fs.readFile(path.join(file, 'plugin.json'), next);
 						},
 						function(configJSON, next) {
+							var config;
+
 							try {
-								var config = JSON.parse(configJSON);
+								config = JSON.parse(configJSON);
 							} catch (err) {
 								winston.warn("Plugin: " + file + " is corrupted or invalid. Please check plugin.json for errors.");
 								return next(err, null);
@@ -662,4 +728,23 @@ var fs = require('fs'),
 			callback(err, plugins);
 		});
 	};
+
+
+
+	function addLanguages(router, middleware, controllers, callback) {
+		Plugins.customLanguages.forEach(function(lang) {
+			router.get('/language' + lang.route, function(req, res, next) {
+				res.json(lang.file);
+			});
+
+			var components = lang.route.split('/'),
+				language = components[1],
+				filename = components[2].replace('.json', '');
+
+			translator.addTranslation(language, filename, lang.file);
+		});
+
+		callback(null);
+	}
+
 }(exports));
