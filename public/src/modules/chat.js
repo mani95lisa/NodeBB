@@ -205,10 +205,13 @@ define('chat', ['taskbar', 'string', 'sounds', 'forum/chats'], function(taskbar,
 					module.close(chatModal);
 				});
 
-				chatModal.find('button[data-action="maximize"]').on('click', function() {
+				function gotoChats() {
 					ajaxify.go('chats/' + utils.slugify(username));
 					module.close(chatModal);
-				});
+				}
+
+				chatModal.find('.modal-header').on('dblclick', gotoChats);
+				chatModal.find('button[data-action="maximize"]').on('click', gotoChats);
 
 				chatModal.on('click', function(e) {
 					module.bringModalToTop(chatModal);
@@ -261,7 +264,7 @@ define('chat', ['taskbar', 'string', 'sounds', 'forum/chats'], function(taskbar,
 
 	module.center = function(chatModal) {
 		chatModal.css("left", Math.max(0, (($(window).width() - $(chatModal).outerWidth()) / 2) + $(window).scrollLeft()) + "px");
-		chatModal.css("top", Math.max(0, $(window).height() / 4 - $(chatModal).outerHeight() / 2));
+		chatModal.css("top", Math.max(0, $(window).height() / 2 - $(chatModal).outerHeight() / 2) + "px");
 		chatModal.css("zIndex", 100);
 		chatModal.find('#chat-message-input').focus();
 		return chatModal;

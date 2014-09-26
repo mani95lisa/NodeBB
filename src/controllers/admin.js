@@ -21,7 +21,7 @@ var adminController = {
 	tags: {},
 	topics: {},
 	groups: {},
-	themes: {},
+	appearance: {},
 	events: {},
 	database: {},
 	plugins: {},
@@ -203,7 +203,9 @@ adminController.languages.get = function(req, res, next) {
 };
 
 adminController.settings.get = function(req, res, next) {
-	res.render('admin/settings', {
+	var term = req.params.term ? req.params.term : 'general';
+
+	res.render('admin/settings/' + term, {
 		'csrf': req.csrfToken()
 	});
 };
@@ -212,7 +214,19 @@ adminController.logger.get = function(req, res, next) {
 	res.render('admin/logger', {});
 };
 
-adminController.themes.get = function(req, res, next) {
+adminController.appearance.get = function(req, res, next) {
+	var term = req.params.term ? req.params.term : 'themes';
+
+	if (term === 'widgets') {
+		renderWidgets(req, res, next);
+	} else {
+		res.render('admin/appearance/' + term, {});
+	}
+};
+
+
+// todo: move to extend
+function renderWidgets(req, res, next) {
 	async.parallel({
 		areas: function(next) {
 			var defaultAreas = [
@@ -242,17 +256,6 @@ adminController.themes.get = function(req, res, next) {
 				}
 			}
 
-			var branding = [];
-
-			for (var key in meta.css.branding) {
-				if (meta.css.branding.hasOwnProperty(key)) {
-					branding.push({
-						key: key,
-						value: meta.css.branding[key]
-					});
-				}
-			}
-
 			var templates = [],
 				list = {}, index = 0;
 
@@ -273,15 +276,14 @@ adminController.themes.get = function(req, res, next) {
 				});
 			});
 
-			res.render('admin/themes', {
+			res.render('admin/appearance/widgets', {
 				templates: templates,
 				areas: widgetData.areas,
-				widgets: widgetData.widgets,
-				branding: branding
+				widgets: widgetData.widgets
 			});
 		});
 	});
-};
+}
 
 adminController.groups.get = function(req, res, next) {
 	groups.list({

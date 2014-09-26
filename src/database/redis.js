@@ -101,8 +101,6 @@
 
 		if (nconf.get('redis:password')) {
 			cxn.auth(nconf.get('redis:password'));
-		} else {
-			winston.warn('You have no redis password setup!');
 		}
 
 		cxn.on('error', function (err) {

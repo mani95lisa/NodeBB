@@ -21,6 +21,10 @@ topicsController.get = function(req, res, next) {
 		uid = req.user ? req.user.uid : 0,
 		userPrivileges;
 
+	if (req.params.post_index && !utils.isNumber(req.params.post_index)) {
+		return categoriesController.notFound(req, res);
+	}
+
 	async.waterfall([
 		function (next) {
 			async.parallel({
@@ -32,6 +36,9 @@ topicsController.get = function(req, res, next) {
 				},
 				settings: function(next) {
 					user.getSettings(uid, next);
+				},
+				slug: function(next) {
+					topics.getTopicField(tid, 'slug', next);
 				}
 			}, next);
 		},
@@ -52,6 +59,10 @@ topicsController.get = function(req, res, next) {
 			userPrivileges = results.privileges;
 
 			if (userPrivileges.disabled) {
+				return categoriesController.notFound(req, res);
+			}
+
+			if (tid + '/' + req.params.slug !== results.slug) {
 				return categoriesController.notFound(req, res);
 			}
 
@@ -109,7 +120,7 @@ topicsController.get = function(req, res, next) {
 					return categoriesController.notAllowed(req, res);
 				}
 
-				topicData.pageCount = Math.ceil(parseInt(postCount, 10) / settings.postsPerPage);
+				topicData.pageCount = Math.ceil((postCount - 1) / settings.postsPerPage);
 
 				topicData.currentPage = page;
 				if(page > 1) {

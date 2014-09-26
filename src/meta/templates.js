@@ -1,3 +1,5 @@
+"use strict";
+
 var mkdirp = require('mkdirp'),
 	rimraf = require('rimraf'),
 	winston = require('winston'),
@@ -17,11 +19,14 @@ Templates.compile = function(callback) {
 	if (cluster.isWorker && process.env.cluster_setup !== 'true') {
 		return setTimeout(function() {
 			emitter.emit('templates:compiled');
-			if (callback) callback();
+			if (callback) {
+				callback();
+			}
 		}, 1000);
 	}
 
-	var baseTemplatesPath = nconf.get('base_templates_path'),
+	var coreTemplatesPath = nconf.get('core_templates_path'),
+		baseTemplatesPath = nconf.get('base_templates_path'),
 		viewsPath = nconf.get('views_dir'),
 		themeTemplatesPath = nconf.get('theme_templates_path');
 
@@ -31,6 +36,9 @@ Templates.compile = function(callback) {
 		mkdirp.sync(viewsPath);
 
 		async.parallel({
+			coreTpls: function(next) {
+				utils.walk(coreTemplatesPath, next);
+			},
 			baseTpls: function(next) {
 				utils.walk(baseTemplatesPath, next);
 			},
@@ -38,7 +46,8 @@ Templates.compile = function(callback) {
 				utils.walk(themeTemplatesPath, next);
 			}
 		}, function(err, data) {
-			var baseTpls = data.baseTpls,
+			var coreTpls = data.coreTpls,
+				baseTpls = data.baseTpls,
 				themeTpls = data.themeTpls,
 				paths = {};
 
@@ -46,8 +55,13 @@ Templates.compile = function(callback) {
 				winston.warn('[meta/templates] Could not find base template files at: ' + baseTemplatesPath);
 			}
 
+			coreTpls = !coreTpls ? [] : coreTpls.map(function(tpl) { return tpl.replace(coreTemplatesPath, ''); });
 			baseTpls = !baseTpls ? [] : baseTpls.map(function(tpl) { return tpl.replace(baseTemplatesPath, ''); });
 			themeTpls = !themeTpls ? [] : themeTpls.map(function(tpl) { return tpl.replace(themeTemplatesPath, ''); });
+
+			coreTpls.forEach(function(el, i) {
+				paths[coreTpls[i]] = path.join(coreTemplatesPath, coreTpls[i]);
+			});
 
 			baseTpls.forEach(function(el, i) {
 				paths[baseTpls[i]] = path.join(baseTemplatesPath, baseTpls[i]);
@@ -79,19 +93,37 @@ Templates.compile = function(callback) {
 					}
 				}
 
+				if (relativePath.match(/^\/admin\/[\s\S]*?/)) {
+					addIndex(relativePath, file);
+				}
+
 				mkdirp.sync(path.join(viewsPath, relativePath.split('/').slice(0, -1).join('/')));
 				fs.writeFile(path.join(viewsPath, relativePath), file, next);
 			}, function(err) {
 				if (err) {
 					winston.error('[themes] ' + err.stack);
 				} else {
-					winston.info('[themes] Successfully compiled templates.');
-					emitter.emit('templates:compiled');
-					if (callback) callback();
+					compileIndex(viewsPath, function() {
+						winston.info('[themes] Successfully compiled templates.');
+						emitter.emit('templates:compiled');
+						if (callback) {
+							callback();
+						}
+					});
 				}
 			});
 		});
 	});
 };
+
+var searchIndex = {};
+
+function addIndex(path, file) {
+	searchIndex[path] = file;
+}
+
+function compileIndex(viewsPath, callback) {
+	fs.writeFile(path.join(viewsPath, '/indexed.json'), JSON.stringify(searchIndex), callback);
+}
 
 module.exports = Templates;
