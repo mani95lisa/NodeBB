@@ -8,6 +8,7 @@ var async = require('async'),
 	user = require('../user'),
 	utils = require('../../public/src/utils'),
 	db = require('../database'),
+	meta = require('../meta'),
 	notifications = require('../notifications'),
 	posts = require('../posts'),
 	postTools = require('../postTools'),
@@ -227,9 +228,10 @@ var async = require('async'),
 				if (err) {
 					return callback(err);
 				}
+
 				value = value ? value.toString() : '';
 				nids = notifications.filter(function(notification) {
-					return notification && notification[field] !== value;
+					return notification && notification[field] === value;
 				}).map(function(notification) {
 					return notification.nid;
 				});
@@ -292,6 +294,25 @@ var async = require('async'),
 					});
 				});
 			});
+		});
+	};
+
+	UserNotifications.sendWelcomeNotification = function(uid) {
+		if (!meta.config.welcomeNotification) {
+			return;
+		}
+
+		var path = meta.config.welcomeLink ? meta.config.welcomeLink : '#';
+
+		notifications.create({
+			bodyShort: meta.config.welcomeNotification,
+			bodyLong: meta.config.welcomeNotification,
+			path: path,
+			nid: 'welcome_' + uid
+		}, function(err, notification) {
+			if (!err && notification) {
+				notifications.push(notification, [uid]);
+			}
 		});
 	};
 

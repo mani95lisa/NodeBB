@@ -8,6 +8,7 @@ var winston = require('winston'),
 	os = require('os'),
 	nconf = require('nconf'),
 	cluster = require('cluster'),
+	fs = require('fs'),
 
 	plugins = require('../plugins'),
 	emitter = require('../emitter'),
@@ -25,6 +26,7 @@ module.exports = function(Meta) {
 			base: [
 				'public/vendor/jquery/js/jquery.js',
 				'public/vendor/jquery/js/jquery-ui-1.10.4.custom.js',
+				'./node_modules/socket.io-client/dist/socket.io.js',
 				'public/vendor/jquery/timeago/jquery.timeago.min.js',
 				'public/vendor/jquery/js/jquery.form.min.js',
 				'public/vendor/jquery/serializeObject/jquery.ba-serializeobject.min.js',
@@ -148,6 +150,9 @@ module.exports = function(Meta) {
 							cache: minifiedString,
 							map: mapString
 						});
+
+						// Save the minfile in public/ so things like nginx can serve it
+						Meta.js.commitToFile();
 					}
 
 					if (typeof callback === 'function') {
@@ -207,6 +212,21 @@ module.exports = function(Meta) {
 		if (Meta.js.minifierProc) {
 			Meta.js.minifierProc.kill('SIGTERM');
 		}
+	};
+
+	Meta.js.commitToFile = function() {
+		winston.info('[meta/js] Committing minfile to disk');
+		async.parallel([
+			async.apply(fs.writeFile, path.join(__dirname, '../../public/nodebb.min.js'), Meta.js.cache),
+			async.apply(fs.writeFile, path.join(__dirname, '../../public/nodebb.min.js.map'), Meta.js.map)
+		], function (err) {
+			if (!err) {
+				winston.info('[meta/js] Client-side minfile and mapping committed to disk.');
+			} else {
+				winston.error('[meta/js] ' + err.message);
+				process.exit(0);
+			}
+		});
 	};
 
 	function getPluginScripts(callback) {

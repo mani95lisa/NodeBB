@@ -413,22 +413,12 @@ function enableDefaultPlugins(next) {
 		'nodebb-widget-essentials',
 		'nodebb-plugin-soundpack-default'
 	];
-
-	async.each(defaultEnabled, function (pluginId, next) {
-		Plugins.isActive(pluginId, function (err, active) {
-			if (!active) {
-				Plugins.toggleActive(pluginId, function () {
-					next();
-				});
-			} else {
-				next();
-			}
-		});
-	}, next);
+	var	db = require('./database');
+	db.setAdd('plugins:active', defaultEnabled, next);
 }
 
 function setCopyrightWidget(next) {
-	var	db = require('./database.js');
+	var	db = require('./database');
 
 	db.init(function(err) {
 		if (!err) {

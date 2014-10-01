@@ -1,10 +1,85 @@
 "use strict";
-/*global define, app, socket, RELATIVE_PATH */
+/*global define, app, socket, Hammer, RELATIVE_PATH */
 
 define('forum/admin/footer', ['forum/admin/settings'], function(Settings) {
 	var acpIndex;
 
 	$(document).ready(function() {
+		if(!/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+			getSearchIndex();
+		} else {
+			activateMobile();
+		}
+
+		$(window).on('action:ajaxify.end', function(ev, data) {
+			var url = data.url;
+
+			selectMenuItem(data.url);
+		});
+
+		setupMainMenu();
+	});
+
+	function activateMobile() {
+		$('.admin').addClass('mobile');
+		$('#main-menu').addClass('transitioning');
+
+		Hammer(document.body).on('swiperight', function(e) {
+			$('#main-menu').addClass('open');
+		});
+
+		Hammer(document.body).on('swipeleft', function(e) {
+			$('#main-menu').removeClass('open');
+		});
+
+		Hammer($('#main-menu')[0]).on('swiperight', function(e) {
+			$('#main-menu').addClass('open');
+		});
+
+		Hammer($('#main-menu')[0]).on('swipeleft', function(e) {
+			$('#main-menu').removeClass('open');
+		});
+
+		$(window).on('scroll', function() {
+			$('#main-menu').height($(window).height() + 20);
+		});
+	}
+
+	function setupMainMenu() {
+		$('.sidebar-nav .nav-header').on('click', function() {
+			$(this).parents('.sidebar-nav').toggleClass('open');
+			setTimeout(function() {
+				$('.nano').nanoScroller();
+			}, 500); // replace with animationend event
+		});
+
+		$('.nano').nanoScroller();
+
+		$('#main-menu .nav-list > li a').append('<span class="pull-right"><i class="fa fa-inverse fa-arrow-circle-right"></i>&nbsp;</span>');
+	}
+
+	function selectMenuItem(url) {
+		$('#main-menu .nav-list > li').removeClass('active').each(function() {
+			var menu = $(this),
+				category = menu.parents('.sidebar-nav'),
+				href = menu.children('a').attr('href');
+
+			if (href && href.slice(1).indexOf(url) !== -1) {
+				category.addClass('open');
+				menu.addClass('active');
+				modifyBreadcrumb(category.find('.nav-header').text(), menu.text());
+				return false;
+			}
+		});
+	}
+
+	function modifyBreadcrumb() {
+		var caret = ' <i class="fa fa-angle-right"></i> ';
+		
+		$('#breadcrumbs').html(caret + Array.prototype.slice.call(arguments).join(caret));
+	}
+
+	function getSearchIndex() {
 		$.getJSON(RELATIVE_PATH + '/templates/indexed.json', function (data) {
 			acpIndex = data;
 			for (var file in acpIndex) {
@@ -22,27 +97,23 @@ define('forum/admin/footer', ['forum/admin/settings'], function(Settings) {
 
 			setupACPSearch();
 		});
-
-		$(window).on('action:ajaxify.end', function() {
-			setupPills();
-		});
-	});
-
-	function setupPills() {
-		$('.navigation.nav-pills li').removeClass('active');
-
-		var slug = window.location.href.split('/');
-		slug = slug[slug.length-1];
-		$('.navigation.nav-pills [data-pill="' + slug + '"]').addClass('active');
 	}
 	
 	function setupACPSearch() {
 		var menu = $('#acp-search .dropdown-menu');
 
+		$('#acp-search input').on('keyup', function() {
+			$('#acp-search .dropdown').addClass('open');
+		});
+
 		$('#acp-search input').on('keyup focus', function() {
 			var $input = $(this),
 				value = $input.val().toLowerCase(),
 				menuItems = $('#acp-search .dropdown-menu').html('');
+
+			function toUpperCase(txt){
+				return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+			}
 
 			if (value.length >= 3) {
 				for (var file in acpIndex) {
@@ -59,7 +130,7 @@ define('forum/admin/footer', ['forum/admin/settings'], function(Settings) {
 								if (title.hasOwnProperty(t)) {
 									title[t] = title[t]
 										.replace('-', ' ')
-										.replace(/\w\S*/g, function(txt){return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();});
+										.replace(/\w\S*/g, toUpperCase);
 								}
 							}
 
@@ -78,7 +149,7 @@ define('forum/admin/footer', ['forum/admin/settings'], function(Settings) {
 			if (value.length > 0) {
 				menuItems.append('<li role="presentation"><a role="menuitem" href="' + RELATIVE_PATH + '/search/' + value + '">Search the forum for <strong>' + value + '</strong></a></li>');
 			} else {
-				menuItems.append('<li role="presentation"><a role="menuitem" href="' + RELATIVE_PATH + '/search/' + value + '">Click here for forum-wide search</a></li>');
+				menuItems.append('<li role="presentation"><a role="menuitem" href="#">Start typing to see results...</a></li>');
 			}
 		});
 	}

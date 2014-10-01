@@ -7,9 +7,7 @@
 		async = require('async'),
 		nconf = require('nconf'),
 		session = require('express-session'),
-		db,
-		mongoClient,
-		mongoStore;
+		db, mongoClient;
 
 	module.questions = [
 		{
@@ -55,8 +53,13 @@
 			winston.error('Unable to initialize MongoDB! Is MongoDB installed? Error :' + err.message);
 			process.exit();
 		}
-
-		mongoClient.connect('mongodb://'+ nconf.get('mongo:host') + ':' + nconf.get('mongo:port') + '/' + nconf.get('mongo:database'), function(err, _db) {
+		var connString = 'mongodb://'+ nconf.get('mongo:host') + ':' + nconf.get('mongo:port') + '/' + nconf.get('mongo:database');
+		var connOptions = {
+			server: {
+				poolSize: nconf.get('mongo:poolSize') || 10
+			}
+		};
+		mongoClient.connect(connString, connOptions, function(err, _db) {
 			if(err) {
 				winston.error("NodeBB could not connect to your Mongo database. Mongo returned the following error: " + err.message);
 				process.exit();
@@ -98,12 +101,6 @@
 
 			function createIndices() {
 				db.collection('objects').ensureIndex({_key :1, score: -1}, {background:true}, function(err) {
-					if(err) {
-						winston.error('Error creating index ' + err.message);
-					}
-				});
-
-				db.collection('objects').ensureIndex({_key :1, score: 1}, {background:true}, function(err) {
 					if(err) {
 						winston.error('Error creating index ' + err.message);
 					}

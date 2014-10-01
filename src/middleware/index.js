@@ -29,27 +29,6 @@ var utils = require('./../../public/src/utils'),
 
 var middleware = {};
 
-function routeThemeScreenshots(app, themes) {
-	var	screenshotPath;
-
-	async.each(themes, function(themeObj, next) {
-		if (themeObj.screenshot) {
-			screenshotPath = path.join(themesPath, themeObj.id, themeObj.screenshot);
-			(function(id, path) {
-				fs.exists(path, function(exists) {
-					if (exists) {
-						app.get(relativePath + '/css/previews/' + id, function(req, res) {
-							res.sendfile(path);
-						});
-					}
-				});
-			})(themeObj.id, screenshotPath);
-		} else {
-			next(false);
-		}
-	});
-}
-
 function routeCurrentTheme(app, themeId, themesData) {
 	var themeId = (themeId || 'nodebb-theme-vanilla'),
 		themeObj = (function(id) {
@@ -63,16 +42,7 @@ function routeCurrentTheme(app, themeId, themesData) {
 		winston.info('[themes] Using theme ' + themeId);
 	}
 
-	// Theme's templates path
-	var themePath = nconf.get('base_templates_path'),
-		fallback = path.join(themesPath, themeObj.id, 'templates');
-	if (themeObj.templates) {
-		themePath = path.join(themesPath, themeObj.id, themeObj.templates);
-	} else if (fs.existsSync(fallback)) {
-		themePath = fallback;
-	}
-
-	nconf.set('theme_templates_path', themePath);
+	meta.themes.setPath(themeObj);
 }
 
 module.exports = function(app, data) {
@@ -99,7 +69,7 @@ module.exports = function(app, data) {
 	app.use(cookieParser());
 
 	var cookie = {
-		maxAge: 1000 * 60 * 60 * 24 * parseInt(meta.configs.loginDays || 14, 10)
+		maxAge: 1000 * 60 * 60 * 24 * parseInt(meta.config.loginDays || 14, 10)
 	};
 	if(meta.config.cookieDomain) {
 		cookie.domain = meta.config.cookieDomain;
@@ -132,7 +102,6 @@ module.exports = function(app, data) {
 	auth.initialize(app, middleware);
 
 	routeCurrentTheme(app, data.currentThemeId, data.themesData);
-	routeThemeScreenshots(app, data.themesData);
 	meta.templates.compile();
 
 	return middleware;

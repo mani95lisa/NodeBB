@@ -6,6 +6,7 @@ var async = require('async'),
 	user = require('./user'),
 	meta = require('./meta'),
 	db = require('./database'),
+	plugins = require('./plugins'),
 	posts = require('./posts'),
 	utils = require('../public/src/utils');
 
@@ -444,6 +445,10 @@ var async = require('async'),
 		Groups.exists(groupName, function(err, exists) {
 			if (exists) {
 				db.setAdd('group:' + groupName + ':members', uid, callback);
+				plugins.fireHook('action:groups.join', {
+					groupName: groupName,
+					uid: uid
+				});				
 			} else {
 				Groups.create(groupName, '', function(err) {
 					if (err) {
@@ -452,6 +457,10 @@ var async = require('async'),
 					}
 					Groups.hide(groupName);
 					db.setAdd('group:' + groupName + ':members', uid, callback);
+					plugins.fireHook('action:groups.join', {
+						groupName: groupName,
+						uid: uid
+					});
 				});
 			}
 		});
@@ -464,6 +473,11 @@ var async = require('async'),
 			if (err) {
 				return callback(err);
 			}
+
+			plugins.fireHook('action:groups.leave', {
+				groupName: groupName,
+				uid: uid
+			});
 
 			// If this is a hidden group, and it is now empty, delete it
 			Groups.get(groupName, {}, function(err, group) {
