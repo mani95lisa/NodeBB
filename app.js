@@ -80,7 +80,7 @@ if (nconf.get('config')) {
 }
 configExists = fs.existsSync(configFile);
 
-if (!nconf.get('help') && !nconf.get('setup') && !nconf.get('install') && !nconf.get('upgrade') && !nconf.get('reset') && configExists) {
+if (!nconf.get('setup') && !nconf.get('install') && !nconf.get('upgrade') && !nconf.get('reset') && configExists) {
 	start();
 } else if (nconf.get('setup') || nconf.get('install') || !configExists) {
 	setup();
@@ -88,8 +88,6 @@ if (!nconf.get('help') && !nconf.get('setup') && !nconf.get('install') && !nconf
 	upgrade();
 } else if (nconf.get('reset')) {
 	reset();
-} else {
-	displayHelp();
 }
 
 function loadConfig() {
@@ -150,14 +148,10 @@ function start() {
 
 					plugins.ready(function() {
 						webserver.init(function() {
-							// If this callback is called, this means that loader.js is used
-							process.on('message', function(msg) {
-								if (msg === 'bind') {
-									webserver.listen();
-								}
-							});
-							process.send({
-								action: 'ready'
+							webserver.listen(function() {
+								process.send({
+									action: 'ready'
+								});
 							});
 						});
 					});
@@ -178,7 +172,7 @@ function start() {
 							case 'css-propagate':
 								meta.css.cache = message.cache;
 								meta.css.acpCache = message.acpCache;
-								winston.info('[cluster] Stylesheet propagated to worker ' + cluster.worker.id);
+								winston.info('[cluster] Stylesheets propagated to worker ' + cluster.worker.id);
 							break;
 						}
 					});
@@ -192,10 +186,12 @@ function start() {
 					});
 				} else {
 					winston.warn('Your NodeBB schema is out-of-date. Please run the following command to bring your dataset up to spec:');
-					winston.warn('    node app --upgrade');
-					winston.warn('To ignore this error (not recommended):');
-					winston.warn('    node app --no-check-schema');
-					process.exit();
+					winston.warn('    ./nodebb upgrade');
+					if (cluster.isWorker) {
+						cluster.worker.kill();
+					} else {
+						process.exit();
+					}
 				}
 			});
 		});
@@ -366,16 +362,4 @@ function restart() {
 		winston.error('[app] Could not restart server. Shutting down.');
 		shutdown(1);
 	}
-}
-
-function displayHelp() {
-	winston.info('Usage: node app [options] [arguments]');
-	winston.info('       [NODE_ENV=development | NODE_ENV=production] node app [--start] [arguments]');
-	winston.info('');
-	winston.info('Options:');
-	winston.info('  --help              displays this usage information');
-	winston.info('  --setup             configure your environment and setup NodeBB');
-	winston.info('  --upgrade           upgrade NodeBB, first read: https://docs.nodebb.org/en/latest/upgrading/');
-	winston.info('  --reset             soft resets NodeBB; disables all plugins and restores selected theme to Vanilla');
-	winston.info('  --start             manually start NodeBB (default when no options are given)');
 }

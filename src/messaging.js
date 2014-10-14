@@ -97,7 +97,7 @@ var db = require('./database'),
 			month: 2592000000,
 			threemonths: 7776000000
 		};
-		since = terms[since] || terms['day'];
+		since = terms[since] || terms.day;
 		var count = parseInt(meta.config.chatMessageInboxSize, 10) || 250;
 		db.getSortedSetRevRangeByScore('messages:uid:' + uids[0] + ':to:' + uids[1], 0, count, Infinity, Date.now() - since, function(err, mids) {
 			if (err) {
@@ -260,13 +260,7 @@ var db = require('./database'),
 					}
 				});
 
-				db.sortedSetRevRank('uid:' + uid + ':chats', results.users[results.users.length - 1].uid, function(err, rank) {
-					if (err) {
-						return callback(err);
-					}
-
-					callback(null, {users: results.users, nextStart: rank + 1});
-				});
+				callback(null, {users: results.users, nextStart: end + 1});
 			});
 		});
 	};
@@ -347,7 +341,7 @@ var db = require('./database'),
 		}
 
 		return (matrix[b.length][a.length] / b.length < 0.1);
-	};
+	}
 
 	Messaging.notifyUser = function(fromuid, touid, messageObj) {
 		var queueObj = Messaging.notifyQueue[fromuid + ':' + touid];

@@ -15,17 +15,16 @@ module.exports = function(db, module) {
 		}
 
 		value = helpers.valueToString(value);
-		var data = {
-			score: parseInt(score, 10),
-			value: value
-		};
 
-		db.collection('objects').update({_key: key, value: value}, {$set: data}, {upsert:true, w: 1}, function(err) {
+		db.collection('objects').update({_key: key, value: value}, {$set: {score: parseInt(score, 10)}}, {upsert:true, w: 1}, function(err) {
 			callback(err);
 		});
 	};
 
 	function sortedSetAddBulk(key, scores, values, callback) {
+		if (!scores.length || !values.length) {
+			return callback();
+		}
 		if (scores.length !== values.length) {
 			return callback(new Error('[[error:invalid-data]]'));
 		}
@@ -35,7 +34,7 @@ module.exports = function(db, module) {
 		var bulk = db.collection('objects').initializeUnorderedBulkOp();
 
 		for(var i=0; i<scores.length; ++i) {
-			bulk.find({_key: key, value: values[i]}).upsert().updateOne({$set: {score: scores[i], value: values[i]}});
+			bulk.find({_key: key, value: values[i]}).upsert().updateOne({$set: {score: scores[i]}});
 		}
 
 		bulk.execute(function(err, result) {
@@ -49,15 +48,11 @@ module.exports = function(db, module) {
 			return callback();
 		}
 		value = helpers.valueToString(value);
-		var data = {
-			score: parseInt(score, 10),
-			value: value
-		};
 
 		var bulk = db.collection('objects').initializeUnorderedBulkOp();
 
 		for(var i=0; i<keys.length; ++i) {
-			bulk.find({_key: keys[i], value: value}).upsert().updateOne({$set: data});
+			bulk.find({_key: keys[i], value: value}).upsert().updateOne({$set: {score: parseInt(score, 10)}});
 		}
 
 		bulk.execute(function(err, result) {
@@ -107,7 +102,7 @@ module.exports = function(db, module) {
 
 		var fields = {_id: 0, value: 1};
 		if (withScores) {
-			fields['score'] = 1;
+			fields.score = 1;
 		}
 		db.collection('objects').find({_key:key}, {fields: fields})
 			.limit(stop - start + 1)
@@ -162,15 +157,15 @@ module.exports = function(db, module) {
 
 		var scoreQuery = {};
 		if (min !== -Infinity) {
-			scoreQuery['$gte'] = min;
+			scoreQuery.$gte = min;
 		}
 		if (max !== Infinity) {
-			scoreQuery['$lte'] = max;
+			scoreQuery.$lte = max;
 		}
 
 		var fields = {_id: 0, value: 1};
 		if (withScores) {
-			fields['score'] = 1;
+			fields.score = 1;
 		}
 
 		db.collection('objects').find({_key:key, score: scoreQuery}, {fields: fields})
@@ -203,7 +198,7 @@ module.exports = function(db, module) {
 
 	module.sortedSetCard = function(key, callback) {
 		if (!key) {
-			return callback();
+			return callback(null, 0);
 		}
 		db.collection('objects').count({_key: key}, function(err, count) {
 			count = parseInt(count, 10);
@@ -287,6 +282,9 @@ module.exports = function(db, module) {
 			}
 
 			var result = values.map(function(value) {
+				if (!value) {
+					return null;
+				}
 				var index = sortedSet.indexOf(value.toString());
 				return index !== -1 ? index : null;
 			});
@@ -300,7 +298,7 @@ module.exports = function(db, module) {
 			return callback();
 		}
 		value = helpers.valueToString(value);
-		db.collection('objects').findOne({_key:key, value: value}, {fields:{score: 1}}, function(err, result) {
+		db.collection('objects').findOne({_key:key, value: value}, {fields:{_id: 0, score: 1}}, function(err, result) {
 			callback(err, result ? result.score : null);
 		});
 	};
@@ -310,7 +308,7 @@ module.exports = function(db, module) {
 			return callback();
 		}
 		value = helpers.valueToString(value);
-		db.collection('objects').find({_key:{$in:keys}, value: value}).toArray(function(err, result) {
+		db.collection('objects').find({_key:{$in:keys}, value: value}, {_id:0, _key:1, score: 1}).toArray(function(err, result) {
 			if (err) {
 				return callback(err);
 			}
@@ -333,7 +331,7 @@ module.exports = function(db, module) {
 			return callback();
 		}
 		values = values.map(helpers.valueToString);
-		db.collection('objects').find({_key: key, value: {$in: values}}).toArray(function(err, result) {
+		db.collection('objects').find({_key: key, value: {$in: values}}, {_id: 0, value: 1, score: 1}).toArray(function(err, result) {
 			if (err) {
 				return callback(err);
 			}
@@ -366,7 +364,7 @@ module.exports = function(db, module) {
 			return callback();
 		}
 		values = values.map(helpers.valueToString);
-		db.collection('objects').find({_key: key, value: {$in: values}}).toArray(function(err, results) {
+		db.collection('objects').find({_key: key, value: {$in: values}}, {fields: {_id: 0, value: 1}}).toArray(function(err, results) {
 			if (err) {
 				return callback(err);
 			}
@@ -434,7 +432,7 @@ module.exports = function(db, module) {
 		}
 		var data = {};
 		value = helpers.fieldToString(value);
-		data['score'] = parseInt(increment, 10);
+		data.score = parseInt(increment, 10);
 
 		db.collection('objects').findAndModify({_key: key, value: value}, {}, {$inc: data}, {new:true, upsert:true}, function(err, result) {
 			callback(err, result ? result[value] : null);

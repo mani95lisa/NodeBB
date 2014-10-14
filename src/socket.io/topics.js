@@ -38,7 +38,7 @@ SocketTopics.post = function(socket, data, callback) {
 		}
 
 		callback(null, result.topicData);
-		socket.emit('event:new_post', {posts: result.postData});
+		socket.emit('event:new_post', {posts: [result.postData]});
 		socket.emit('event:new_topic', result.topicData);
 
 		var uids = websockets.getConnectedClients();
@@ -53,7 +53,7 @@ SocketTopics.post = function(socket, data, callback) {
 
 				for(var i=0; i<uids.length; ++i) {
 					if (parseInt(uids[i], 10) !== socket.uid) {
-						websockets.in('uid_' + uids[i]).emit('event:new_post', {posts: result.postData});
+						websockets.in('uid_' + uids[i]).emit('event:new_post', {posts: [result.postData]});
 						websockets.in('uid_' + uids[i]).emit('event:new_topic', result.topicData);
 					}
 				}

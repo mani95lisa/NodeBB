@@ -6,6 +6,7 @@ var async = require('async'),
 
 	user = require('../user'),
 	categories = require('../categories'),
+	posts = require('../posts'),
 	topics = require('../topics'),
 	meta = require('../meta'),
 	db = require('../database'),
@@ -21,6 +22,7 @@ var async = require('async'),
 var adminController = {
 	categories: {},
 	tags: {},
+	flags: {},
 	topics: {},
 	groups: {},
 	appearance: {},
@@ -28,6 +30,7 @@ var adminController = {
 		widgets: {}
 	},
 	events: {},
+	logs: {},
 	database: {},
 	plugins: {},
 	languages: {},
@@ -153,6 +156,17 @@ adminController.tags.get = function(req, res, next) {
 	});
 };
 
+adminController.flags.get = function(req, res, next) {
+	var uid = req.user ? parseInt(req.user.uid, 10) : 0;
+	posts.getFlags(uid, 0, 19, function(err, posts) {
+		if (err) {
+			return next(err);
+		}
+
+		res.render('admin/manage/flags', {posts: posts, next: 20});
+	});
+};
+
 adminController.database.get = function(req, res, next) {
 	db.info(function (err, data) {
 		res.render('admin/advanced/database', data);
@@ -160,14 +174,27 @@ adminController.database.get = function(req, res, next) {
 };
 
 adminController.events.get = function(req, res, next) {
-	events.getLog(function(err, data) {
+	events.getLog(-1, 5000, function(err, data) {
 		if(err || !data) {
 			return next(err);
 		}
 
-		data = data.toString().split('\n').reverse().join('\n');
 		res.render('admin/advanced/events', {
-			eventdata: data
+			eventdata: data.data,
+			next: data.next
+		});
+	});
+};
+
+adminController.logs.get = function(req, res, next) {
+	var logPath = path.join('logs', path.sep, 'output.log');
+	fs.readFile(logPath, function(err, data) {
+		if (err || !data) {
+			data = '';
+		}
+
+		res.render('admin/advanced/logs', {
+			data: data.toString()
 		});
 	});
 };
@@ -181,7 +208,7 @@ adminController.plugins.get = function(req, res, next) {
 		res.render('admin/extend/plugins' , {
 			plugins: plugins
 		});
-	})
+	});
 };
 
 adminController.languages.get = function(req, res, next) {
@@ -315,6 +342,6 @@ adminController.themes.get = function(req, res, next) {
 			return next();
 		}
 	});
-}
+};
 
 module.exports = adminController;

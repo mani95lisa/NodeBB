@@ -114,7 +114,7 @@ var db = require('./database'),
 				topics.getTopicsByTids(tids, uid, next);
 			},
 			function(topics, next) {
-				if (!topics || !topics.length) {
+				if (!Array.isArray(topics) || !topics.length) {
 					return next(null, {
 						topics: [],
 						nextStart: 1
@@ -131,15 +131,9 @@ var db = require('./database'),
 					topics[i].index = indices[topics[i].tid];
 				}
 
-				db.sortedSetRevRank('categories:' + cid + ':tid', topics[topics.length - 1].tid, function(err, rank) {
-					if(err) {
-						return next(err);
-					}
-
-					next(null, {
-						topics: topics,
-						nextStart: parseInt(rank, 10) + 1
-					});
+				next(null, {
+					topics: topics,
+					nextStart: stop + 1
 				});
 			}
 		], callback);
@@ -441,10 +435,10 @@ var db = require('./database'),
 					db.incrObjectField('category:' + cid, 'post_count', next);
 				},
 				function(next) {
-					if(parseInt(topicData.pinned, 10) === 0) {
-						db.sortedSetAdd('categories:' + cid + ':tid', postData.timestamp, postData.tid, next);
-					} else {
+					if (parseInt(topicData.pinned, 10) === 1) {
 						next();
+					} else {
+						db.sortedSetAdd('categories:' + cid + ':tid', postData.timestamp, postData.tid, next);
 					}
 				}
 			], callback);
