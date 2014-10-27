@@ -44,7 +44,8 @@ global.env = process.env.NODE_ENV || 'production';
 
 winston.remove(winston.transports.Console);
 winston.add(winston.transports.Console, {
-	colorize: true
+	colorize: true,
+	timestamp: true
 });
 
 winston.add(winston.transports.File, {
@@ -113,7 +114,7 @@ function loadConfig() {
 function start() {
 	loadConfig();
 
-	if (!cluster.isWorker) {
+	if (!cluster.isWorker || process.env.cluster_setup === 'true') {
 		winston.info('Time: ' + new Date());
 		winston.info('Initializing NodeBB v' + pkg.version);
 		winston.info('* using configuration stored in: ' + configFile);
@@ -178,9 +179,9 @@ function start() {
 							break;
 						}
 					});
-					
+
 					process.on('uncaughtException', function(err) {
-						winston.error(err.message);
+						winston.error(err.stack);
 						console.log(err.stack);
 
 						meta.js.killMinifier();

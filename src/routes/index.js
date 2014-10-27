@@ -50,7 +50,7 @@ function tagRoutes(app, middleware, controllers) {
 
 function categoryRoutes(app, middleware, controllers) {
 	setupPageRoute(app, '/popular/:term?', middleware, [], controllers.categories.popular);
-	setupPageRoute(app, '/recent/:term?', middleware, [], controllers.categories.recent);
+	setupPageRoute(app, '/recent', middleware, [], controllers.categories.recent);
 	setupPageRoute(app, '/unread', middleware, [middleware.authenticate], controllers.categories.unread);
 	app.get('/api/unread/total', middleware.authenticate, controllers.categories.unreadTotal);
 
@@ -148,6 +148,16 @@ module.exports = function(app, middleware) {
 	if (process.env.NODE_ENV === 'development') {
 		require('./debug')(app, middleware, controllers);
 	}
+
+	app.use(function(req, res, next) {
+		if (req.user || parseInt(meta.config.privateUploads, 10) !== 1) {
+			return next();
+		}
+		if (req.path.indexOf('/uploads/files') === 0) {
+			return res.status(403).json('not-allowed');
+		}
+		next();
+	});
 
 	app.use(relativePath, express.static(path.join(__dirname, '../../', 'public'), {
 		maxAge: app.enabled('cache') ? 5184000000 : 0

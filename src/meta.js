@@ -40,6 +40,7 @@ var async = require('async'),
 				async.parallel([
 					async.apply(Meta.js.minify, false),
 					async.apply(Meta.css.minify),
+					async.apply(Meta.sounds.init),
 					async.apply(Meta.templates.compile),
 					async.apply(auth.reloadRoutes),
 					function(next) {

@@ -128,7 +128,7 @@ middleware.addSlug = function(req, res, next) {
 };
 
 middleware.checkTopicIndex = function(req, res, next) {
-	db.sortedSetCard('categories:' + req.params.category_id + ':tid', function(err, topicCount) {
+	categories.getCategoryField(req.params.category_id, 'topic_count', function(err, topicCount) {
 		if (err) {
 			return next(err);
 		}
@@ -168,7 +168,7 @@ middleware.checkGlobalPrivacySettings = function(req, res, next) {
 			return res.status(403).json('not-allowed');
 		} else {
 			req.session.returnTo = req.url;
-			return res.redirect('login');
+			return res.redirect('/login');
 		}
 	}
 
@@ -363,7 +363,7 @@ middleware.renderHeader = function(req, res, callback) {
 			},
 			user: function(next) {
 				if (uid) {
-					user.getUserFields(uid, ['username', 'userslug', 'picture', 'status'], next);
+					user.getUserFields(uid, ['username', 'userslug', 'picture', 'status', 'banned'], next);
 				} else {
 					next();
 				}
@@ -373,12 +373,18 @@ middleware.renderHeader = function(req, res, callback) {
 				return callback(err);
 			}
 
+			if (results.user && parseInt(results.user.banned, 10) === 1) {
+				req.logout();
+				res.redirect('/');
+				return;
+			}
+
 			templateValues.browserTitle = results.title;
 			templateValues.isAdmin = results.isAdmin || false;
 			templateValues.user = results.user;
 			templateValues.customCSS = results.customCSS;
 			templateValues.customJS = results.customJS;
-			templateValues.maintenanceHeader = meta.config.maintenanceMode === '1' && !results.isAdmin;
+			templateValues.maintenanceHeader = parseInt(meta.config.maintenanceMode, 10) === 1 && !results.isAdmin;
 
 			app.render('header', templateValues, callback);
 		});
@@ -467,19 +473,45 @@ middleware.addExpiresHeaders = function(req, res, next) {
 };
 
 middleware.maintenanceMode = function(req, res, next) {
+	if (meta.config.maintenanceMode !== '1') {
+		return next();
+	}
+
 	var allowedRoutes = [
-			'/login'
+			'/login',
+			'/stylesheet.css',
+			'/nodebb.min.js',
+			'/vendor/fontawesome/fonts/fontawesome-webfont.woff'
 		],
 		render = function() {
-			middleware.buildHeader(req, res, function() {
-				res.render('maintenance', {
-					site_title: meta.config.site_title || 'NodeBB',
-					message: meta.config.maintenanceModeMessage
-				});
-			});
-		};
+			res.status(503);
 
-	if (meta.config.maintenanceMode === '1' && allowedRoutes.indexOf(req.url) === -1) {
+			if (!isApiRoute.test(req.url)) {
+				middleware.buildHeader(req, res, function() {
+					res.render('maintenance', {
+						site_title: meta.config.title || 'NodeBB',
+						message: meta.config.maintenanceModeMessage
+					});
+				});
+			} else {
+				translator.translate('[[pages:maintenance.text, ' + meta.config.title + ']]', meta.config.defaultLang || 'en_GB', function(translated) {
+					res.json({
+						error: translated
+					});
+				});
+			}
+		},
+		isAllowed = function(url) {
+			for(var x=0,numAllowed=allowedRoutes.length,route;x<numAllowed;x++) {
+				route = new RegExp(allowedRoutes[x]);
+				if (route.test(url)) {
+					return true;
+				}
+			}
+		},
+		isApiRoute = /^\/api/;
+
+	if (!isAllowed(req.url)) {
 		if (!req.user) {
 			return render();
 		} else {

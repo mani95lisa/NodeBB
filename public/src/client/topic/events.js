@@ -40,7 +40,8 @@ define('forum/topic/events', ['forum/topic/browsing', 'forum/topic/postTools', '
 		'posts.downvote': togglePostVote,
 		'posts.unvote': togglePostVote,
 
-		'event:topic.toggleReply': toggleReply,
+		'event:topic.notifyTyping': onNotifyTyping,
+		'event:topic.stopNotifyTyping': onStopNotifyTyping
 	};
 
 	Events.init = function() {
@@ -109,7 +110,7 @@ define('forum/topic/events', ['forum/topic/browsing', 'forum/topic/postTools', '
 		if (data.tags && data.tags.length !== $('.tags').first().children().length) {
 			templates.parse('partials/post_bar', 'tags', {tags: data.tags}, function(html) {
 				var tags = $('.tags');
-				
+
 				tags.fadeOut(250, function() {
 					tags.html(html).fadeIn(250);
 				});
@@ -121,6 +122,7 @@ define('forum/topic/events', ['forum/topic/browsing', 'forum/topic/postTools', '
 		$('#post-container li[data-pid="' + pid + '"]').fadeOut(500, function() {
 			$(this).remove();
 		});
+		postTools.updatePostCount();
 	}
 
 	function togglePostDeleteState(data) {
@@ -141,8 +143,6 @@ define('forum/topic/events', ['forum/topic/browsing', 'forum/topic/postTools', '
 				postEl.find('.post-content').html(data.content);
 			}
 		}
-
-		postTools.updatePostCount();
 	}
 
 	function togglePostFavourite(data) {
@@ -169,8 +169,23 @@ define('forum/topic/events', ['forum/topic/browsing', 'forum/topic/postTools', '
 		post.find('.downvote').toggleClass('btn-primary downvoted', data.downvote);
 	}
 
-	function toggleReply(data) {
-		$('.thread_active_users [data-uid="' + data.uid + '"]').toggleClass('replying', data.isReplying);
+	function onNotifyTyping(data) {
+		var userEl = $('.thread_active_users [data-uid="' + data.uid + '"]');
+		userEl.addClass('replying');
+
+		var timeoutId = userEl.attr('timeoutId');
+		if (timeoutId) {
+			clearTimeout(timeoutId);
+			timeoutId = 0;
+		}
+		timeoutId = setTimeout(function() {
+			userEl.removeClass('replying');
+		}, 7000);
+		userEl.attr('timeoutId', timeoutId);
+	}
+
+	function onStopNotifyTyping(data) {
+		$('.thread_active_users [data-uid="' + data.uid + '"]').removeClass('replying');
 	}
 
 	return Events;

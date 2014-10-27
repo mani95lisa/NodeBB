@@ -45,6 +45,7 @@ Loader.init = function(callback) {
 };
 
 Loader.displayStartupMessages = function(callback) {
+	console.log('');
 	console.log('NodeBB v' + pkg.version + ' Copyright (C) 2013-2014 NodeBB Inc.');
 	console.log('This program comes with ABSOLUTELY NO WARRANTY.');
 	console.log('This is free software, and you are welcome to redistribute it under certain conditions.');
@@ -169,6 +170,10 @@ Loader.addClusterEvents = function(callback) {
 				handle_jobs: wasPrimary
 			});
 		}
+	});
+
+	cluster.on('disconnect', function(worker) {
+		console.log('[cluster] Child Process (' + worker.process.pid + ') has disconnected');
 	});
 
 	callback();

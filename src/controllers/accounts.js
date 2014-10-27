@@ -137,6 +137,9 @@ accountsController.getUserByUID = function(req, res, next) {
 	var uid = req.params.uid ? req.params.uid : 0;
 
 	user.getUserData(uid, function(err, userData) {
+		if (err) {
+			return next(err);
+		}
 		res.json(userData);
 	});
 };
@@ -170,7 +173,7 @@ accountsController.getAccount = function(req, res, next) {
 				posts.getPostsByUid(callerUID, userData.theirid, 0, 9, next);
 			},
 			signature: function(next) {
-				postTools.parse(userData.signature, next);
+				postTools.parseSignature(userData.signature, next);
 			}
 		}, function(err, results) {
 			if(err) {

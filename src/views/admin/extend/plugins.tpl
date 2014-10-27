@@ -10,8 +10,6 @@
 						<div class="pull-right">
 							<button data-action="toggleActive" class="btn <!-- IF plugins.active --> btn-warning<!-- ELSE --> btn-success<!-- ENDIF plugins.active -->"><i class="fa fa-power-off"></i> <!-- IF plugins.active -->Deactivate<!-- ELSE -->Activate<!-- ENDIF plugins.active --></button>
 
-
-
 							<button data-action="toggleInstall" class="btn btn-danger"><i class="fa fa-trash-o"></i> Uninstall</button>
 						</div>
 
@@ -51,6 +49,9 @@
 						<!-- IF plugins.description -->
 						<p>{plugins.description}</p>
 						<!-- ENDIF plugins.description -->
+
+						<small>Latest <strong class="latestVersion">{plugins.latest}</strong></small>
+
 						<!-- IF plugins.url -->
 						<p>For more information: <a href="{plugins.url}">{plugins.url}</a></p>
 						<!-- ENDIF plugins.url -->

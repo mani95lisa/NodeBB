@@ -34,7 +34,7 @@ module.exports = function(db, module) {
 		var bulk = db.collection('objects').initializeUnorderedBulkOp();
 
 		for(var i=0; i<scores.length; ++i) {
-			bulk.find({_key: key, value: values[i]}).upsert().updateOne({$set: {score: scores[i]}});
+			bulk.find({_key: key, value: values[i]}).upsert().updateOne({$set: {score: parseInt(scores[i], 10)}});
 		}
 
 		bulk.execute(function(err, result) {
@@ -61,18 +61,21 @@ module.exports = function(db, module) {
 	};
 
 	module.sortedSetRemove = function(key, value, callback) {
+		function done(err) {
+			callback(err);
+		}
 		callback = callback || helpers.noop;
 		if (!key) {
 			return callback();
 		}
-		if (!Array.isArray(value)) {
-			value = [value];
-		}
-		value = value.map(helpers.valueToString);
 
-		db.collection('objects').remove({_key: key, value: {$in: value}}, function(err) {
-			callback(err);
-		});
+		if (Array.isArray(value)) {
+			value = value.map(helpers.valueToString);
+			db.collection('objects').remove({_key: key, value: {$in: value}}, done);
+		} else {
+			value = helpers.valueToString(value);
+			db.collection('objects').remove({_key: key, value: value}, done);
+		}
 	};
 
 	module.sortedSetsRemove = function(keys, value, callback) {

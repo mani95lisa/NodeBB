@@ -14,13 +14,13 @@ define('admin/general/dashboard', ['semver'], function(semver) {
 		app.enterRoom('admin');
 		socket.emit('meta.rooms.getAll', Admin.updateRoomUsage);
 
-		isMobile = !/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+		isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
 		intervals.rooms = setInterval(function() {
 			if (app.isFocused && app.isConnected) {
 				socket.emit('meta.rooms.getAll', Admin.updateRoomUsage);
 			}
-		}, 5000);
+		}, 10000);
 
 		$(window).on('action:ajaxify.start', function(ev, data) {
 			clearInterval(intervals.rooms);
@@ -125,20 +125,20 @@ define('admin/general/dashboard', ['semver'], function(semver) {
 			return app.alertError(err.message);
 		}
 
-		var html = '<div class="text-center pull-left">' + 
-						'<div>'+ data.onlineRegisteredCount +'</div>' + 
+		var html = '<div class="text-center pull-left">' +
+						'<div>'+ data.onlineRegisteredCount +'</div>' +
 						'<div>Users</div>' +
 					'</div>' +
-					'<div class="text-center pull-left">' + 
-						'<div>'+ data.onlineGuestCount +'</div>' + 
+					'<div class="text-center pull-left">' +
+						'<div>'+ data.onlineGuestCount +'</div>' +
 						'<div>Guests</div>' +
 					'</div>' +
-					'<div class="text-center pull-left">' + 
-						'<div>'+ (data.onlineRegisteredCount + data.onlineGuestCount) +'</div>' + 
+					'<div class="text-center pull-left">' +
+						'<div>'+ (data.onlineRegisteredCount + data.onlineGuestCount) +'</div>' +
 						'<div>Total</div>' +
 					'</div>' +
-					'<div class="text-center pull-left">' + 
-						'<div>'+ data.socketCount +'</div>' + 
+					'<div class="text-center pull-left">' +
+						'<div>'+ data.socketCount +'</div>' +
 						'<div>Connections</div>' +
 					'</div>';
 
@@ -293,7 +293,9 @@ define('admin/general/dashboard', ['semver'], function(semver) {
 		graphs.topics = new Chart(topicsCtx).Doughnut([], {responsive: true});
 		topicsCanvas.onclick = function(evt){
 			var obj = graphs.topics.getSegmentsAtEvent(evt);
-			window.open(RELATIVE_PATH + '/topic/' + obj[0].tid);
+			if (obj && obj[0]) {
+				window.open(RELATIVE_PATH + '/topic/' + obj[0].tid);
+			}
 		};
 
 		intervals.graphs = setInterval(updateTrafficGraph, 15000);
@@ -316,7 +318,7 @@ define('admin/general/dashboard', ['semver'], function(semver) {
 	}
 
 	function updateTrafficGraph() {
-		if (!app.isFocused  || !app.isConnected) {
+		if (!app.isFocused) {
 			return;
 		}
 
@@ -359,7 +361,7 @@ define('admin/general/dashboard', ['semver'], function(semver) {
 			segments = graphs.topics.segments;
 
 		function reassignExistingTopics() {
-			for (var i = 0, ii = segments.length; i < ii; i++ ) {
+			for (var i = segments.length - 1; i >= 0; i--) {
 				if (!segments[i]) {
 					continue;
 				}
@@ -367,7 +369,7 @@ define('admin/general/dashboard', ['semver'], function(semver) {
 				var tid = segments[i].tid;
 
 				if ($.inArray(tid, tids) === -1) {
-					usedTopicColors.splice($.inArray(segments[i].color, usedTopicColors), 1);
+					usedTopicColors.splice($.inArray(segments[i].fillColor, usedTopicColors), 1);
 					graphs.topics.removeData(i);
 				} else {
 					graphs.topics.segments[i].value = topics[tid].value;
