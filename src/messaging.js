@@ -16,6 +16,13 @@ var db = require('./database'),
 (function(Messaging) {
 	Messaging.notifyQueue = {};	// Only used to notify a user of a new chat message, see Messaging.notifyUser
 
+	var terms = {
+		day: 86400000,
+		week: 604800000,
+		month: 2592000000,
+		threemonths: 7776000000
+	};
+
 	function sortUids(fromuid, touid) {
 		return [fromuid, touid].sort();
 	}
@@ -80,15 +87,14 @@ var db = require('./database'),
 	Messaging.getMessages = function(fromuid, touid, since, isNew, callback) {
 		var uids = sortUids(fromuid, touid);
 
-		var terms = {
-			day: 86400000,
-			week: 604800000,
-			month: 2592000000,
-			threemonths: 7776000000
-		};
-		since = terms[since] || terms.day;
 		var count = parseInt(meta.config.chatMessageInboxSize, 10) || 250;
-		db.getSortedSetRevRangeByScore('messages:uid:' + uids[0] + ':to:' + uids[1], 0, count, Infinity, Date.now() - since, function(err, mids) {
+		var min = Date.now() - (terms[since] || terms.day);
+		if (since === 'recent') {
+			count = 49;
+			min = 0;
+		}
+
+		db.getSortedSetRevRangeByScore('messages:uid:' + uids[0] + ':to:' + uids[1], 0, count, Infinity, min, function(err, mids) {
 			if (err) {
 				return callback(err);
 			}
@@ -285,6 +291,34 @@ var db = require('./database'),
 			});
 		}, 1000*60);	// wait 60s before sending
 	};
+
+	Messaging.canMessage = function(fromUid, toUid, callback) {
+		async.waterfall([
+			function(next) {
+				// Check if the sending user is an admin
+				user.isAdministrator(fromUid, function(err, isAdmin) {
+					next(err || isAdmin);
+				});
+			},
+			function(next) {
+				// Retrieve the recipient's user setting
+				user.getSettings(toUid, function(err, settings) {
+					next(err || !settings.restrictChat);
+				});
+			},
+			function(next) {
+				// Does toUid follow fromUid?
+				user.isFollowing(toUid, fromUid, next);
+			}
+		], function(err, allowed) {
+			// Handle premature returns
+			if (err === true) {
+				return callback(undefined, true);
+			}
+
+			callback.apply(this, arguments);
+		});
+	}
 
 	function sendNotifications(fromuid, touid, messageObj, callback) {
 		// todo #1798 -- this should check if the user is in room `chat_{uidA}_{uidB}` instead, see `Sockets.uidInRoom(uid, room);`

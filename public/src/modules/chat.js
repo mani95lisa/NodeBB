@@ -295,7 +295,7 @@ define('chat', ['taskbar', 'string', 'sounds', 'forum/chats'], function(taskbar,
 	};
 
 	function getChatMessages(chatModal, callback) {
-		socket.emit('modules.chats.get', {touid: chatModal.attr('touid'), since: 'day'}, function(err, messages) {
+		socket.emit('modules.chats.get', {touid: chatModal.attr('touid'), since: 'recent'}, function(err, messages) {
 			module.appendChatMessage(chatModal, messages, callback);
 		});
 	}
@@ -351,6 +351,10 @@ define('chat', ['taskbar', 'string', 'sounds', 'forum/chats'], function(taskbar,
 
 	module.toggleNew = function(uuid, state) {
 		taskbar.toggleNew(uuid, state);
+	};
+
+	module.canMessage = function(toUid, callback) {
+		socket.emit('modules.chats.canMessage', toUid, callback);
 	};
 
 	return module;
