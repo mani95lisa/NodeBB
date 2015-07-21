@@ -8,5 +8,6 @@
     "watch": "订阅",
     "ignore": "忽略",
     "watch.message": "您现在已经订阅了此版块",
-    "ignore.message": "您现在已经取消订阅了此版块"
+    "ignore.message": "您现在已经取消订阅了此版块",
+    "category":" "
 }

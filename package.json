@@ -49,7 +49,7 @@
     "nodebb-plugin-spam-be-gone": "^0.4.1",
     "nodebb-rewards-essentials": "^0.0.1",
     "nodebb-theme-lavender": "^1.0.47",
-    "nodebb-theme-persona": "^1.0.13",
+    "nodebb-theme-persona": "git+https://github.com/mani95lisa/nodebb-theme-persona.git",
     "nodebb-theme-vanilla": "^2.0.12",
     "nodebb-widget-essentials": "^1.0.2",
     "npm": "^2.1.4",
