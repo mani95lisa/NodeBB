@@ -23,9 +23,10 @@ module.exports = function(Meta) {
 					var pkgData = JSON.parse(pkgData),
 						ok = semver.satisfies(pkgData.version, pkg.dependencies[module]);
 
-					if (ok || pkgData._resolved.indexOf('https://') != -1) {
+					if (ok || pkgData._resolved.indexOf('//github.com') != -1) {
 						next(true);
 					} else {
+						console.log(pkgData);
 						process.stdout.write('[' + 'outdated'.yellow + '] ' + module.bold + ' v' + pkgData.version + ', requires ' + pkg.dependencies[module] + '\n')
 						next(false);
 					}
