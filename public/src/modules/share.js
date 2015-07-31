@@ -31,6 +31,13 @@ define('share', function() {
 			return false;
 		});
 
+		addHandler('.weibo-share', function () {
+			var url = encodeURIComponent(baseUrl + getPostUrl($(this)));
+			var share_url = 'http://service.weibo.com/share/share.php?url='+url+'&title='+name+'&type=button&language=zh_cn&searchPic=true&appkey=2004330677&style=number&ralateUid=5172806724'
+			window.open(share_url, '_blank','width=550,height=420,scrollbars=no,status=no');
+			return false;
+		});
+
 		addHandler('.twitter-share', function () {
 			return openShare('https://twitter.com/intent/tweet?text=' + name + '&url=', getPostUrl($(this)), 550, 420);
 		});
